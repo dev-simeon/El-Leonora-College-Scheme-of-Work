@@ -1,0 +1,23 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "lib": ["ES2021"],
+    "jsx": "react-jsx",
+    "allowJs": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "strict": true,
+    "forceConsistentCasingInFileNames": true,
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "noEmit": true,
+    "isolatedModules": true,
+    "incremental": true,
+    "types": ["react", "react-native", "react-dom"]
+  },
+  "include": ["src", "app", "index.js", "App.tsx"],
+  "exclude": ["node_modules", "babel.config.js", "metro.config.js"],
+  "extends": "expo/tsconfig.base"
+}
