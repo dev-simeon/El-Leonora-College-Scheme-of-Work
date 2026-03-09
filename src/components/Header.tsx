@@ -1,5 +1,6 @@
 import React from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { COLORS } from "../constants/colors";
 import { SPACING } from "../constants/spacing";
 
@@ -12,8 +13,9 @@ export function Header({
   onBack?: () => void;
   right?: React.ReactNode;
 }) {
+  const insets = useSafeAreaInsets();
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingTop: insets.top }]}>
       {onBack ? (
         <TouchableOpacity onPress={onBack} style={styles.back}>
           <Text style={styles.backText}>{"‹"}</Text>
@@ -29,7 +31,6 @@ export function Header({
 
 const styles = StyleSheet.create({
   container: {
-    height: 56,
     paddingHorizontal: SPACING.md,
     flexDirection: "row",
     alignItems: "center",

@@ -1,0 +1,14 @@
+{
+  "build": {
+    "production": {
+      "android": {
+        "buildType": "apk"
+      },
+      "distribution": "store"
+    },
+    "simulator": {
+      "distribution": "internal",
+      "developmentClient": true
+    }
+  }
+}
