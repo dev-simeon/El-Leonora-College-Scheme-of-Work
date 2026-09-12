@@ -23,8 +23,8 @@ export function DashboardHeader() {
           <Ionicons name="school" size={24} color={COLORS.brandBlue} />
         </View>
         <View style={styles.textContainer}>
-          <Text style={styles.title}>El-Leonora College</Text>
-          <Text style={styles.subtitle}>Scheme of Work</Text>
+          <Text style={styles.title}>El-Leonora</Text>
+          <Text style={styles.subtitle}>Student Companion app</Text>
         </View>
       </View>
       <View style={styles.rightSection}>

@@ -21,7 +21,7 @@ export const COLORS = {
   textBlue: "#4C669A",
   borderGray: "#F3F4F6",
   progressBarBg: "#E5E7EB",
-  backgroundLight: "#F6F6F8",
+  backgroundLight: "#F0F7FF",
   searchBackground: "#F8F9FC",
 
   // Status colors

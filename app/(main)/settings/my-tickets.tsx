@@ -1,11 +1,10 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Platform,
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
@@ -13,6 +12,7 @@ import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { BackButton } from "../../../src/components/BackButton";
 import { COLORS } from "../../../src/constants/colors";
+import { useAuth } from "../../../src/context/AuthContext";
 import CreateTicketModal from "../../../src/components/CreateTicketModal";
 
 interface Ticket {
@@ -57,6 +57,7 @@ const TICKET_DATA: Ticket[] = [
 export default function MyTicketsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { user } = useAuth();
   const [modalVisible, setModalVisible] = useState(false);
 
   const handleCreateTicket = () => {
@@ -64,11 +65,12 @@ export default function MyTicketsScreen() {
   };
 
   const handleSubmitTicket = (subject: string, description: string) => {
-    console.log("Submit ticket:", { subject, description });
+    // TODO: Wire up to real tickets API endpoint
+    void subject; void description;
   };
 
-  const handleTicketPress = (ticketId: string) => {
-    console.log("View ticket:", ticketId);
+  const handleTicketPress = (_ticketId: string) => {
+    // TODO: Navigate to ticket detail screen
   };
 
   const renderStatusBadge = (status: "in_progress" | "resolved") => {
@@ -145,14 +147,16 @@ export default function MyTicketsScreen() {
             </View>
           </ScrollView>
 
-          {/* Floating Action Button */}
-          <TouchableOpacity
-            style={styles.fab}
-            onPress={handleCreateTicket}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="add" size={30} color="white" />
-          </TouchableOpacity>
+          {/* Floating Action Button - Only for Staff with Admin Officer role */}
+          {(user?.role === "staff" && user?.backendRole?.toLowerCase() === "admin officer") && (
+            <TouchableOpacity
+              style={styles.fab}
+              onPress={handleCreateTicket}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="add" size={30} color="white" />
+            </TouchableOpacity>
+          )}
 
           {/* Create Ticket Modal */}
           <CreateTicketModal

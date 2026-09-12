@@ -1,0 +1,13 @@
+{
+  "supportsES6": true,
+  "withSeparateModelsAndApi": true,
+  "prependFormOrBodyParameters": true,
+  "legacyDiscriminatorBehavior": false,
+  "apiPackage": "endpoints",
+  "modelPackage": "models",
+  "useSingleRequestParameter": true,
+  "modelPropertyNaming": "camelCase",
+  "paramNaming": "camelCase",
+  "enumPropertyNaming": "original",
+  "stringEnums": true
+}

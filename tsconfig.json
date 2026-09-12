@@ -2,7 +2,7 @@
   "compilerOptions": {
     "target": "ESNext",
     "module": "esnext",
-    "lib": ["ES2021"],
+    "lib": ["ES2021", "dom"],
     "jsx": "react-jsx",
     "allowJs": true,
     "skipLibCheck": true,

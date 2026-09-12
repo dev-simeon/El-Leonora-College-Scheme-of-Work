@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import {
   View,
   Text,
@@ -65,8 +65,7 @@ export default function CreateTicketModal({
   };
 
   const handleAttachment = () => {
-    // TODO: Implement file attachment
-    console.log("Add attachment");
+    // TODO: Implement file attachment picker
   };
 
   return (

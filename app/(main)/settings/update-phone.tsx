@@ -15,7 +15,9 @@ import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context"
 import { StatusBar } from "expo-status-bar";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
+import { useToast } from "../../../src/context/ToastContext";
 import { BackButton } from "../../../src/components/BackButton";
+import { getRequestErrorMessage } from "../../../src/utils/apiError";
 
 const validateNigerianPhoneNumber = (phoneNumber: string): boolean => {
   const cleaned = phoneNumber.replace(/\s/g, "");
@@ -25,6 +27,7 @@ const validateNigerianPhoneNumber = (phoneNumber: string): boolean => {
 
 export default function UpdatePhoneScreen() {
   const router = useRouter();
+  const { showToast } = useToast();
   const insets = useSafeAreaInsets();
 
   const [oldPhone, setOldPhone] = useState("");
@@ -39,7 +42,7 @@ export default function UpdatePhoneScreen() {
 
   const handleUpdate = async () => {
     if (!oldPhone.trim()) {
-      Alert.alert("Required Field", "Please enter your old phone number.");
+      showToast({ message: "Please enter your old phone number.", type: "error" });
       return;
     }
     if (!validateNigerianPhoneNumber(oldPhone)) {
@@ -49,7 +52,7 @@ export default function UpdatePhoneScreen() {
       return;
     }
     if (!newPhone.trim()) {
-      Alert.alert("Required Field", "Please enter your new phone number.");
+      showToast({ message: "Please enter your new phone number.", type: "error" });
       return;
     }
     if (!validateNigerianPhoneNumber(newPhone)) {
@@ -59,10 +62,7 @@ export default function UpdatePhoneScreen() {
       return;
     }
     if (oldPhone.replace(/\s/g, "") === newPhone.replace(/\s/g, "")) {
-      Alert.alert(
-        "Same Number",
-        "Your old and new phone numbers cannot be the same.",
-      );
+      showToast({ message: "Your old and new phone numbers cannot be the same.", type: "error" });
       return;
     }
 
@@ -70,14 +70,11 @@ export default function UpdatePhoneScreen() {
     try {
       await new Promise<void>((resolve) => setTimeout(() => resolve(), 1500));
       setIsLoading(false);
-      Alert.alert(
-        "Phone Updated",
-        "Your phone number has been updated successfully.",
-        [{ text: "OK", onPress: () => router.back() }],
-      );
-    } catch {
+      showToast({ message: "Your phone number has been updated successfully.", type: "success" });
+      router.back();
+    } catch (error) {
       setIsLoading(false);
-      Alert.alert("Error", "Failed to update phone number. Please try again.");
+      showToast({ message: getRequestErrorMessage(error, "Failed to update phone number. Please try again."), type: "error" });
     }
   };
 

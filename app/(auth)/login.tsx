@@ -19,12 +19,14 @@ import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { COLORS } from "../../src/constants/colors";
 import { useRouter } from "expo-router";
 import { useAuth } from "../../src/context/AuthContext";
+import { useToast } from "../../src/context/ToastContext";
 
 type UserRole = "student" | "teacher";
 
 export default function LoginScreen() {
   const router = useRouter();
-  const { login } = useAuth();
+  const { studentLogin, staffLogin } = useAuth();
+  const { showToast } = useToast();
   const [selectedRole, setSelectedRole] = useState<UserRole>("student");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -38,33 +40,49 @@ export default function LoginScreen() {
     // Validate form
     if (selectedRole === "student") {
       if (!studentId.trim()) {
-        Alert.alert("Required Field", "Please enter your Admission ID");
+        showToast({ message: "Please enter your Admission ID", type: "error" });
         return;
       }
     } else {
       if (!email.trim()) {
-        Alert.alert("Required Field", "Please enter your Email");
+        showToast({ message: "Please enter your Email", type: "error" });
         return;
       }
       if (!email.includes("@")) {
-        Alert.alert("Invalid Email", "Please enter a valid email address");
+        showToast({ message: "Please enter a valid email address", type: "error" });
         return;
       }
     }
 
     if (!password.trim()) {
-      Alert.alert("Required Field", "Please enter your password");
+      showToast({ message: "Please enter your password", type: "error" });
       return;
     }
 
     setIsLoading(true);
 
     try {
+      if (selectedRole === "student") {
+        await studentLogin({
+          admissionNumber: studentId.trim(),
+          password
+        });
+      } else {
+        await staffLogin({
+          username: email.trim(),
+          password
+        });
+      }
+
+      router.push("/(main)/home");
+      showToast({ message: "Login successful! Welcome back.", type: "success" });
+    } catch (error: any) {
+      const message =
+        error.message ??
+        "Login failed. Please check your credentials.";
+      showToast({ message, type: "error" });
+    } finally {
       setIsLoading(false);
-      router.push("/(auth)/activation");
-    } catch (error) {
-      setIsLoading(false);
-      Alert.alert("Error", "Login failed. Please check your credentials.");
     }
   };
 
@@ -115,7 +133,7 @@ export default function LoginScreen() {
                         onPress={() => setSelectedRole("teacher")}
                       >
                         <View style={[styles.roleOptionInner, selectedRole === "teacher" && styles.roleOptionActive]}>
-                          <Text style={[styles.roleText, selectedRole === "teacher" && styles.roleTextActive]}>Teacher</Text>
+                          <Text style={[styles.roleText, selectedRole === "teacher" && styles.roleTextActive]}>Staff</Text>
                         </View>
                       </Pressable>
                     </View>

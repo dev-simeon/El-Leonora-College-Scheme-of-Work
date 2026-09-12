@@ -5,11 +5,22 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { ActivityIndicator, View } from "react-native";
 import { COLORS } from "../src/constants/colors";
+import { ToastProvider } from "../src/context/ToastContext";
+import { ErrorBoundary } from "../src/components";
+import { cleanupStaleApks } from "../src/services/updateService";
+import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
+import { queryClient, asyncStoragePersister } from "../src/services/queryClient";
 
 function RootLayoutNav() {
-  const { token, isLoading, isFirstLogin } = useAuth();
+  const { token, isLoading, mustChangePassword } = useAuth();
   const segments = useSegments();
   const router = useRouter();
+
+  useEffect(() => {
+    // Remove any leftover APK files from a previous update attempt.
+    // Fire-and-forget — errors are caught inside cleanupStaleApks.
+    cleanupStaleApks();
+  }, []);
 
   useEffect(() => {
     if (isLoading) return;
@@ -23,7 +34,7 @@ function RootLayoutNav() {
       if (!inAuthGroup) {
         router.replace("/(auth)/login");
       }
-    } else if (isFirstLogin) {
+    } else if (mustChangePassword) {
       // Must change password
       if (!inForcePasswordGroup) {
         router.replace("/(force-password)/change-password");
@@ -35,7 +46,7 @@ function RootLayoutNav() {
         router.replace("/(main)/home");
       }
     }
-  }, [token, isLoading, isFirstLogin, segments]);
+  }, [token, isLoading, mustChangePassword, segments]);
 
   if (isLoading) {
     return (
@@ -50,11 +61,20 @@ function RootLayoutNav() {
 
 export default function RootLayout() {
   return (
-    <SafeAreaProvider>
-      <AuthProvider>
-        <StatusBar style="dark" />
-        <RootLayoutNav />
-      </AuthProvider>
-    </SafeAreaProvider>
+    <ErrorBoundary>
+      <SafeAreaProvider>
+        <ToastProvider>
+          <PersistQueryClientProvider
+            client={queryClient}
+            persistOptions={{ persister: asyncStoragePersister }}
+          >
+            <AuthProvider>
+              <StatusBar style="dark" />
+              <RootLayoutNav />
+            </AuthProvider>
+          </PersistQueryClientProvider>
+        </ToastProvider>
+      </SafeAreaProvider>
+    </ErrorBoundary>
   );
 }

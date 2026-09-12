@@ -4,7 +4,13 @@
       "android": {
         "buildType": "apk"
       },
-      "distribution": "store"
+      "distribution": "internal"
+    },
+    "preview": {
+      "android": {
+        "buildType": "apk"
+      },
+      "distribution": "internal"
     },
     "simulator": {
       "distribution": "internal",

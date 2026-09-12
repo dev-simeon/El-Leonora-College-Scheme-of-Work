@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import {
   View,
   Text,
@@ -17,14 +17,28 @@ import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useAuth } from "../context/AuthContext";
 import { BackButton } from "./BackButton";
+import { AccountApi } from "../api/generated/endpoints/account-api";
+import { Configuration } from "../api/generated/configuration";
+import { useToast } from "../context/ToastContext";
+import api, { API_BASE_URL } from "../services/api";
+import { getApiErrorMessage, getRequestErrorMessage } from "../utils/apiError";
 
+// ─── API Client ───────────────────────────────────────────────────────────────
+const accountApi = new AccountApi(
+  new Configuration({ basePath: API_BASE_URL }),
+  API_BASE_URL,
+  api
+);
+
+// ─── Props ────────────────────────────────────────────────────────────────────
 interface ChangePasswordFormProps {
-  /** When true: no back button, must complete before proceeding */
+  /** When true: forced change — no back button, must complete before proceeding */
   isForced: boolean;
   /** Called after a successful password change (before navigation) */
   onSuccess?: () => void;
 }
 
+// ─── Password Input ───────────────────────────────────────────────────────────
 function PasswordField({
   label,
   value,
@@ -55,6 +69,7 @@ function PasswordField({
           value={value}
           onChangeText={onChangeText}
           autoCapitalize="none"
+          autoCorrect={false}
         />
         <Pressable style={styles.inputIconRight} onPress={onToggleShow}>
           <Ionicons
@@ -68,13 +83,25 @@ function PasswordField({
   );
 }
 
+// ─── Strength helper ──────────────────────────────────────────────────────────
+const getStrength = (p: string): { label: string; color: string; pct: number } => {
+  if (!p) return { label: "", color: "#E5E7EB", pct: 0 };
+  if (p.length < 8) return { label: "Too short", color: "#EF4444", pct: 25 };
+  if (p.length < 8) return { label: "Weak", color: "#F97316", pct: 50 };
+  const score = [/[A-Z]/, /[0-9]/, /[^A-Za-z0-9]/].filter((r) => r.test(p)).length;
+  if (score >= 2) return { label: "Strong", color: "#22C55E", pct: 100 };
+  return { label: "Medium", color: "#EAB308", pct: 75 };
+};
+
+// ─── Main Component ───────────────────────────────────────────────────────────
 export default function ChangePasswordForm({
   isForced,
   onSuccess,
 }: ChangePasswordFormProps) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { completeFirstLogin } = useAuth();
+  const { completeMustChangePassword, logout } = useAuth();
+  const { showToast } = useToast();
 
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -85,76 +112,72 @@ export default function ChangePasswordForm({
   const [showConfirm, setShowConfirm] = useState(false);
 
   const [isLoading, setIsLoading] = useState(false);
-
-  // Simple password strength
-  const getStrength = (p: string): { label: string; color: string; pct: number } => {
-    if (!p) return { label: "", color: "#E5E7EB", pct: 0 };
-    if (p.length < 6) return { label: "Too short", color: "#EF4444", pct: 25 };
-    if (p.length < 8) return { label: "Weak", color: "#F97316", pct: 50 };
-    const hasUpper = /[A-Z]/.test(p);
-    const hasNum = /[0-9]/.test(p);
-    const hasSpecial = /[^A-Za-z0-9]/.test(p);
-    const score = [hasUpper, hasNum, hasSpecial].filter(Boolean).length;
-    if (score >= 2) return { label: "Strong", color: "#22C55E", pct: 100 };
-    return { label: "Medium", color: "#EAB308", pct: 75 };
-  };
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const strength = getStrength(newPassword);
 
+  // ── Validation ──────────────────────────────────────────────────────────────
+  const validate = (): string | null => {
+    if (!currentPassword.trim()) return "Please enter your current password.";
+    if (!newPassword.trim()) return "Please enter a new password.";
+    if (newPassword.length < 8) return "New password must be at least 8 characters.";
+    if (newPassword !== confirmPassword) return "New password and confirmation do not match.";
+    if (currentPassword === newPassword) return "New password must be different from the current one.";
+    return null;
+  };
+
+  // ── Submit ──────────────────────────────────────────────────────────────────
   const handleChangePassword = async () => {
-    if (!currentPassword.trim()) {
-      Alert.alert("Required Field", "Please enter your current password.");
-      return;
-    }
-    if (!newPassword.trim()) {
-      Alert.alert("Required Field", "Please enter a new password.");
-      return;
-    }
-    if (newPassword.length < 6) {
-      Alert.alert("Password Too Short", "New password must be at least 6 characters long.");
-      return;
-    }
-    if (newPassword !== confirmPassword) {
-      Alert.alert("Mismatch", "New password and confirmation do not match.");
-      return;
-    }
-    if (currentPassword === newPassword) {
-      Alert.alert("Same Password", "New password must be different from the current one.");
+    setErrorMsg(null);
+
+    const validationError = validate();
+    if (validationError) {
+      setErrorMsg(validationError);
       return;
     }
 
     setIsLoading(true);
     try {
-      // Simulate API call
-      await new Promise<void>((resolve) => setTimeout(() => resolve(), 1500));
-      setIsLoading(false);
+      const response = await accountApi.changePassword({
+        changePasswordDto: {
+          currentPassword,
+          newPassword,
+          confirmNewPassword: confirmPassword,
+        },
+      });
 
+      const body = response.data;
+      console.log('[changePassword] API response:', JSON.stringify(body, null, 2));
+
+      // The server wraps the result in ApiResponse — treat success:false as an error
+      if (body.success === false) {
+        throw new Error(getApiErrorMessage(body, "Password change failed. Please try again."));
+      }
+
+      // ── Success ─────────────────────────────────────────────────────────────
       const successMessage = isForced
         ? "You're all set! Welcome aboard."
         : "Your password has been updated successfully.";
 
-      Alert.alert("Password Changed", successMessage, [
-        {
-          text: "OK",
-          onPress: async () => {
-            if (onSuccess) {
-              onSuccess();
-            }
-            if (isForced) {
-              await completeFirstLogin();
-              // Navigation handled by root layout guard after isFirstLogin=false
-            } else {
-              router.back();
-            }
-          },
-        },
-      ]);
-    } catch {
+      showToast({ message: successMessage, type: "success" });
+      
+      onSuccess?.();
+      if (isForced) {
+        await completeMustChangePassword();
+      } else {
+        router.back();
+      }
+    } catch (error: any) {
+      console.log('[changePassword] ERROR caught');
+      console.log('  message         :', error.message);
+      console.log('  response body   :', JSON.stringify(error.response?.data, null, 2));
+      console.log('  full error      :', JSON.stringify(error, null, 2));
+
+      setErrorMsg(getRequestErrorMessage(error, "Failed to change password. Please try again."));
+    } finally {
       setIsLoading(false);
-      Alert.alert("Error", "Failed to change password. Please try again.");
     }
   };
-
 
   return (
     <View style={styles.outerContainer}>
@@ -188,7 +211,7 @@ export default function ChangePasswordForm({
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
           >
-            {/* Forced-login banner */}
+            {/* Forced-change banner */}
             {isForced && (
               <View style={styles.forcedBanner}>
                 <Ionicons name="shield-checkmark" size={20} color="#135BEC" />
@@ -198,15 +221,11 @@ export default function ChangePasswordForm({
               </View>
             )}
 
-            {/* Icon Section */}
+            {/* Icon */}
             <View style={styles.logoSection}>
               <View style={styles.logoContainer}>
                 <View style={styles.logoBackground}>
-                  <MaterialCommunityIcons
-                    name="lock-reset"
-                    size={48}
-                    color="#135BEC"
-                  />
+                  <MaterialCommunityIcons name="lock-reset" size={48} color="#135BEC" />
                 </View>
               </View>
               <Text style={styles.logoText}>
@@ -219,12 +238,20 @@ export default function ChangePasswordForm({
               </Text>
             </View>
 
+            {/* Error banner */}
+            {errorMsg && (
+              <View style={styles.errorBanner}>
+                <Ionicons name="alert-circle-outline" size={18} color="#DC2626" />
+                <Text style={styles.errorText}>{errorMsg}</Text>
+              </View>
+            )}
+
             {/* Form */}
             <View style={styles.form}>
               <PasswordField
                 label="Current Password"
                 value={currentPassword}
-                onChangeText={setCurrentPassword}
+                onChangeText={(v) => { setCurrentPassword(v); setErrorMsg(null); }}
                 show={showCurrent}
                 onToggleShow={() => setShowCurrent(!showCurrent)}
                 placeholder="Enter current password"
@@ -232,7 +259,7 @@ export default function ChangePasswordForm({
               <PasswordField
                 label="New Password"
                 value={newPassword}
-                onChangeText={setNewPassword}
+                onChangeText={(v) => { setNewPassword(v); setErrorMsg(null); }}
                 show={showNew}
                 onToggleShow={() => setShowNew(!showNew)}
                 placeholder="Enter new password"
@@ -260,7 +287,7 @@ export default function ChangePasswordForm({
               <PasswordField
                 label="Confirm New Password"
                 value={confirmPassword}
-                onChangeText={setConfirmPassword}
+                onChangeText={(v) => { setConfirmPassword(v); setErrorMsg(null); }}
                 show={showConfirm}
                 onToggleShow={() => setShowConfirm(!showConfirm)}
                 placeholder="Re-enter new password"
@@ -270,26 +297,17 @@ export default function ChangePasswordForm({
               {confirmPassword.length > 0 && (
                 <View style={styles.matchRow}>
                   <Ionicons
-                    name={
-                      newPassword === confirmPassword
-                        ? "checkmark-circle"
-                        : "close-circle"
-                    }
+                    name={newPassword === confirmPassword ? "checkmark-circle" : "close-circle"}
                     size={16}
                     color={newPassword === confirmPassword ? "#22C55E" : "#EF4444"}
                   />
                   <Text
                     style={[
                       styles.matchText,
-                      {
-                        color:
-                          newPassword === confirmPassword ? "#22C55E" : "#EF4444",
-                      },
+                      { color: newPassword === confirmPassword ? "#22C55E" : "#EF4444" },
                     ]}
                   >
-                    {newPassword === confirmPassword
-                      ? "Passwords match"
-                      : "Passwords do not match"}
+                    {newPassword === confirmPassword ? "Passwords match" : "Passwords do not match"}
                   </Text>
                 </View>
               )}
@@ -298,10 +316,7 @@ export default function ChangePasswordForm({
             {/* Submit */}
             <View style={styles.actionsSection}>
               <Pressable
-                style={[
-                  styles.submitButton,
-                  isLoading && styles.submitButtonDisabled,
-                ]}
+                style={[styles.submitButton, isLoading && styles.submitButtonDisabled]}
                 onPress={handleChangePassword}
                 disabled={isLoading}
               >
@@ -317,6 +332,37 @@ export default function ChangePasswordForm({
                 )}
               </Pressable>
 
+              {isForced && (
+                <Pressable 
+                  style={styles.logoutButton} 
+                  onPress={async () => {
+                    try {
+                      setIsLoading(true);
+                      console.log('[ChangePasswordForm] Initiation manual logout...');
+                      await logout();
+                    } catch (err: any) {
+                      console.log('[ChangePasswordForm] Logout failed:', err.message);
+                      Alert.alert(
+                        "Logout Failed",
+                        getRequestErrorMessage(err, "Could not clear session. Check network or server status."),
+                        [{ text: "OK" }]
+                      );
+                    } finally {
+                      setIsLoading(false);
+                    }
+                  }}
+                  disabled={isLoading}
+                >
+                  {isLoading ? (
+                    <ActivityIndicator size="small" color="#EF4444" />
+                  ) : (
+                    <>
+                      <Ionicons name="log-out-outline" size={20} color="#EF4444" />
+                      <Text style={styles.logoutText}>Log Out & Clear Session</Text>
+                    </>
+                  )}
+                </Pressable>
+              )}
             </View>
           </ScrollView>
         </KeyboardAvoidingView>
@@ -325,19 +371,11 @@ export default function ChangePasswordForm({
   );
 }
 
+// ─── Styles ───────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  outerContainer: {
-    flex: 1,
-    backgroundColor: "#F6F6F8",
-  },
-  safeAreaContent: {
-    flex: 1,
-    backgroundColor: "#F6F6F8",
-  },
-  container: {
-    flex: 1,
-    backgroundColor: "#F6F6F8",
-  },
+  outerContainer: { flex: 1, backgroundColor: "#F6F6F8" },
+  safeAreaContent: { flex: 1, backgroundColor: "#F6F6F8" },
+  container: { flex: 1, backgroundColor: "#F6F6F8" },
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -355,13 +393,8 @@ const styles = StyleSheet.create({
     flex: 1,
     textAlign: "center",
   },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingHorizontal: 24,
-    paddingBottom: 40,
-  },
+  scrollView: { flex: 1 },
+  scrollContent: { paddingHorizontal: 24, paddingBottom: 40 },
   forcedBanner: {
     flexDirection: "row",
     alignItems: "flex-start",
@@ -381,14 +414,8 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     fontWeight: "500",
   },
-  logoSection: {
-    alignItems: "center",
-    paddingTop: 16,
-    paddingBottom: 28,
-  },
-  logoContainer: {
-    marginBottom: 16,
-  },
+  logoSection: { alignItems: "center", paddingTop: 16, paddingBottom: 20 },
+  logoContainer: { marginBottom: 16 },
   logoBackground: {
     width: 96,
     height: 96,
@@ -407,17 +434,24 @@ const styles = StyleSheet.create({
   },
   description: {
     fontSize: 14,
-    fontWeight: "400",
     color: "#64748B",
     textAlign: "center",
     lineHeight: 22,
   },
-  form: {
-    gap: 4,
-  },
-  formGroup: {
+  errorBanner: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
+    backgroundColor: "#FEF2F2",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#FECACA",
+    padding: 12,
     marginBottom: 16,
   },
+  errorText: { flex: 1, fontSize: 13, color: "#DC2626" },
+  form: { gap: 4 },
+  formGroup: { marginBottom: 16 },
   label: {
     fontSize: 14,
     fontWeight: "500",
@@ -435,18 +469,9 @@ const styles = StyleSheet.create({
     height: 52,
     paddingHorizontal: 4,
   },
-  inputIconLeft: {
-    paddingHorizontal: 12,
-  },
-  input: {
-    flex: 1,
-    fontSize: 15,
-    color: "#111827",
-    paddingVertical: 0,
-  },
-  inputIconRight: {
-    paddingHorizontal: 12,
-  },
+  inputIconLeft: { paddingHorizontal: 12 },
+  input: { flex: 1, fontSize: 15, color: "#111827", paddingVertical: 0 },
+  inputIconRight: { paddingHorizontal: 12 },
   strengthContainer: {
     flexDirection: "row",
     alignItems: "center",
@@ -461,16 +486,8 @@ const styles = StyleSheet.create({
     borderRadius: 9999,
     overflow: "hidden",
   },
-  strengthBarFill: {
-    height: 4,
-    borderRadius: 9999,
-  },
-  strengthLabel: {
-    fontSize: 12,
-    fontWeight: "600",
-    minWidth: 60,
-    textAlign: "right",
-  },
+  strengthBarFill: { height: 4, borderRadius: 9999 },
+  strengthLabel: { fontSize: 12, fontWeight: "600", minWidth: 60, textAlign: "right" },
   matchRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -478,14 +495,8 @@ const styles = StyleSheet.create({
     marginTop: -8,
     marginBottom: 8,
   },
-  matchText: {
-    fontSize: 12,
-    fontWeight: "500",
-  },
-  actionsSection: {
-    marginTop: 24,
-    gap: 12,
-  },
+  matchText: { fontSize: 12, fontWeight: "500" },
+  actionsSection: { marginTop: 24, gap: 12 },
   submitButton: {
     backgroundColor: "#135BEC",
     borderRadius: 12,
@@ -501,27 +512,19 @@ const styles = StyleSheet.create({
     shadowRadius: 15,
     elevation: 5,
   },
-  submitButtonDisabled: {
-    opacity: 0.6,
-  },
-  submitButtonText: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#FFFFFF",
-  },
-  cancelButton: {
-    borderRadius: 12,
+  submitButtonDisabled: { opacity: 0.6 },
+  submitButtonText: { fontSize: 16, fontWeight: "700", color: "#FFFFFF" },
+  logoutButton: {
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    minHeight: 48,
+    gap: 8,
+    marginTop: 12,
     paddingVertical: 12,
-    borderWidth: 1,
-    borderColor: "#E5E7EB",
-    backgroundColor: "#FFFFFF",
   },
-  cancelButtonText: {
-    fontSize: 16,
+  logoutText: {
+    fontSize: 15,
     fontWeight: "600",
-    color: "#64748B",
+    color: "#EF4444",
   },
 });

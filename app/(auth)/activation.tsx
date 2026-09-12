@@ -15,11 +15,12 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { useAuth } from "../../src/context/AuthContext";
+import { useToast } from "../../src/context/ToastContext";
+import { getRequestErrorMessage } from "../../src/utils/apiError";
 
 export default function ActivationScreen() {
   const router = useRouter();
-  const { login } = useAuth();
+  const { showToast } = useToast();
   const [code, setCode] = useState(["", "", "", ""]);
   const [isLoading, setIsLoading] = useState(false);
   const [timer, setTimer] = useState(59);
@@ -80,29 +81,19 @@ export default function ActivationScreen() {
   const handleVerify = async () => {
     const fullCode = code.join("");
     if (fullCode.length < 4) {
-      Alert.alert("Invalid Code", "Please enter the 4-digit activation code sent to you.");
+      showToast({ message: "Please enter the 4-digit activation code sent to you.", type: "error" });
       return;
     }
 
     setIsLoading(true);
     try {
-      // Simulate verification
+      // TODO: Replace with real OTP verification API call using the generated AuthApi
       await new Promise<void>((resolve) => setTimeout(resolve, 1500));
-      
-      // Verification successful - auto login or redirect
-      // For this flow, we'll mock the final step
-      const mockUserData = {
-        id: "USER123",
-        name: "Simeon User",
-        role: "teacher" as const,
-        email: "user@example.com"
-      };
-      
-      await login("final-token", mockUserData, true);
-      setIsLoading(false);
+      router.replace("/(main)");
+      showToast({ message: "Account activated successfully!", type: "success" });
     } catch (error) {
       setIsLoading(false);
-      Alert.alert("Verification Failed", "The code you entered is invalid or has expired.");
+      showToast({ message: getRequestErrorMessage(error, "The code you entered is invalid or has expired."), type: "error" });
     }
   };
 

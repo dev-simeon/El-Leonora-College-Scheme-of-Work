@@ -13,30 +13,97 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
+import { useToast } from "../../../src/context/ToastContext";
 import { BackButton } from "../../../src/components/BackButton";
+import { getRequestErrorMessage } from "../../../src/utils/apiError";
 import { COLORS } from "../../../src/constants/colors";
+import versionData from "../../../src/constants/version.json";
+import { compareVersions } from 'compare-versions';
+import { getLatestVersion } from "../../../src/services/versionService";
+import { downloadAndInstallApk, DownloadProgress } from "../../../src/services/updateService";
+import { AppVersionResponseDto } from "../../../src/api/generated/models";
+
+
+
 
 export default function AboutScreen() {
   const router = useRouter();
+  const { showToast } = useToast();
   const insets = useSafeAreaInsets();
   const [isChecking, setIsChecking] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState<DownloadProgress | null>(null);
+  const [isDownloading, setIsDownloading] = useState(false);
 
   const appInfo = {
-    name: "El-Leonora Scheme of Work",
-    version: "1.0.0",
-    build: "345",
+    name: "Elleonora student companion",
+    version: versionData.versionName,
+  };
+
+  const handleInstallUpdate = async (apkUrl: string, versionName: string) => {
+    setIsDownloading(true);
+    setDownloadProgress(null);
+    try {
+      await downloadAndInstallApk(apkUrl, (progress) => {
+        setDownloadProgress(progress);
+      });
+    } catch (error: any) {
+      showToast({ 
+        message: getRequestErrorMessage(error, "Could not download the update. Please try again."), 
+        type: "error" 
+      });
+    } finally {
+      setIsDownloading(false);
+      setDownloadProgress(null);
+    }
   };
 
   const checkForUpdates = async () => {
     setIsChecking(true);
-    setTimeout(() => {
+    try {
+      // Fetch latest version from server
+      const remoteInfo: AppVersionResponseDto = await getLatestVersion();
+      
+      const serverVersion = remoteInfo.latestVersion || "0.0.0";
+      const currentVersion = versionData.versionName;
+
+      console.log(`[About] Version Check: Current=${currentVersion}, Remote=${serverVersion}`);
+
+      // Semantic version comparison: only prompt if server version is strictly newer
+      if (compareVersions(serverVersion, currentVersion) === 1) {
+        Alert.alert(
+          "Update Available",
+          `A new version (${serverVersion}) is available.\n\n${remoteInfo.forceUpdate ? "This update is required for continued operation.\n\n" : ""}Notes: ${remoteInfo.releaseNotes || "Performance improvements and bug fixes."}`,
+          [
+            { 
+              text: remoteInfo.forceUpdate ? "Close App" : "Later", 
+              style: "cancel" 
+            },
+            {
+              text: "Update Now",
+              onPress: () => {
+                if (remoteInfo.downloadUrl) {
+                  handleInstallUpdate(remoteInfo.downloadUrl, serverVersion);
+                } else {
+                  showToast({ message: "Download URL is not available. Please try again later.", type: "error" });
+                }
+              },
+            },
+          ],
+          { cancelable: !remoteInfo.forceUpdate }
+        );
+      } else {
+        Alert.alert(
+          "Up to Date",
+          `You're running the latest version (${currentVersion}).`,
+          [{ text: "Great!" }]
+        );
+      }
+    } catch (error: any) {
+      console.error("[About] checkForUpdates Error:", error);
+      showToast({ message: getRequestErrorMessage(error, "Could not check for updates. Please try again later."), type: "error" });
+    } finally {
       setIsChecking(false);
-      Alert.alert(
-        "Up to Date",
-        "You're running the latest version (1.0.0).",
-        [{ text: "Great!" }]
-      );
-    }, 1500);
+    }
   };
 
   return (
@@ -90,11 +157,6 @@ export default function AboutScreen() {
           </View>
           
           <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Build Version</Text>
-            <Text style={styles.infoValue}>{appInfo.build}</Text>
-          </View>
-          <View style={styles.separator} />
-          <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Platform</Text>
             <Text style={styles.infoValue}>{Platform.OS === 'ios' ? 'iOS' : 'Android'}</Text>
           </View>
@@ -107,14 +169,42 @@ export default function AboutScreen() {
 
         {/* Actions */}
         <View style={styles.actionContainer}>
+          {/* Download progress bar – shown while downloading an update */}
+          {isDownloading && (
+            <View style={styles.progressCard}>
+              <View style={styles.progressHeader}>
+                <ActivityIndicator size="small" color={COLORS.primary} />
+                <Text style={styles.progressLabel}>
+                  {downloadProgress
+                    ? `Downloading… ${Math.round(downloadProgress.progress * 100)}%`
+                    : "Starting download…"}
+                </Text>
+              </View>
+              <View style={styles.progressTrack}>
+                <View
+                  style={[
+                    styles.progressFill,
+                    { width: `${Math.round((downloadProgress?.progress ?? 0) * 100)}%` },
+                  ]}
+                />
+              </View>
+              {downloadProgress && (
+                <Text style={styles.progressBytes}>
+                  {(downloadProgress.downloadedBytes / 1024 / 1024).toFixed(1)} MB /{" "}
+                  {(downloadProgress.totalBytes / 1024 / 1024).toFixed(1)} MB
+                </Text>
+              )}
+            </View>
+          )}
+
           <Pressable
             style={({ pressed }) => [
               styles.primaryButton,
               pressed && styles.primaryButtonPressed,
-              isChecking && styles.buttonDisabled
+              (isChecking || isDownloading) && styles.buttonDisabled,
             ]}
             onPress={checkForUpdates}
-            disabled={isChecking}
+            disabled={isChecking || isDownloading}
           >
             {isChecking ? (
               <ActivityIndicator color="#FFFFFF" size="small" />
@@ -128,11 +218,12 @@ export default function AboutScreen() {
 
           <Pressable
             style={styles.secondaryButton}
-            onPress={() => Alert.alert("Licenses", "All third-party libraries used in this app are subject to their respective MIT/Apache licenses.")}
+            onPress={() => showToast({ message: "All third-party libraries used in this app are subject to their respective MIT/Apache licenses.", type: "info" })}
           >
             <Text style={styles.secondaryButtonText}>Open Source Licenses</Text>
           </Pressable>
         </View>
+
 
         <Text style={styles.copyrightText}>
           © 2026 El-Leonora College. All rights reserved.
@@ -335,5 +426,42 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "#94A3B8",
     fontWeight: "500",
+  },
+  // ── Download progress styles ─────────────────────────────────────────────
+  progressCard: {
+    backgroundColor: "#F8FAFC",
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    gap: 10,
+  },
+  progressHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  progressLabel: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#334155",
+    flex: 1,
+  },
+  progressTrack: {
+    height: 6,
+    backgroundColor: "#E2E8F0",
+    borderRadius: 3,
+    overflow: "hidden",
+  },
+  progressFill: {
+    height: 6,
+    backgroundColor: COLORS.primary,
+    borderRadius: 3,
+  },
+  progressBytes: {
+    fontSize: 11,
+    color: "#94A3B8",
+    fontWeight: "500",
+    textAlign: "right",
   },
 });
