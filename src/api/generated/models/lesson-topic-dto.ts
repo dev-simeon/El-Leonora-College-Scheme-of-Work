@@ -49,6 +49,12 @@ export interface LessonTopicDto {
     'weekNumber'?: number;
     /**
      * 
+     * @type {number}
+     * @memberof LessonTopicDto
+     */
+    'orderIndex'?: number;
+    /**
+     * 
      * @type {SubjectBasicInfoDto}
      * @memberof LessonTopicDto
      */

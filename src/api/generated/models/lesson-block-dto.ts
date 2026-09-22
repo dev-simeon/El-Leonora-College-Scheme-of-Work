@@ -55,7 +55,8 @@ export enum LessonBlockDtoBlockTypeEnum {
     Paragraph = 'Paragraph',
     List = 'List',
     ListItem = 'ListItem',
-    Image = 'Image'
+    Image = 'Image',
+    Table = 'Table'
 }
 
 

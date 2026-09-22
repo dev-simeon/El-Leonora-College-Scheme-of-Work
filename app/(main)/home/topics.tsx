@@ -45,30 +45,27 @@ export default function TopicsScreen() {
     classId,
     name: subjectName,
     classCode,
-    term: initialTerm,
-    termId: initialTermId,
   } = useLocalSearchParams<{
     id: string;
     classId: string;
     name: string;
     classCode: string;
-    term: string;
-    termId: string;
   }>();
 
-  const [selectedTerm, setSelectedTerm] = useState(initialTerm || "2nd Term");
-  const [selectedTermId, setSelectedTermId] = useState(initialTermId || "2");
+  // Lesson topics use the fixed term IDs expected by the lessons API, rather
+  // than a current academic-session term supplied by another screen.
+  const [selectedTerm, setSelectedTerm] = useState("1st Term");
+  const [selectedTermId, setSelectedTermId] = useState("1");
   const [isTermMenuVisible, setIsTermMenuVisible] = useState(false);
   const { showToast } = useToast();
 
-  // Use the real term ID from params first; only fall back to name map
   const termIdMapNumeric: Record<string, number> = {
     "1st Term": 1,
     "2nd Term": 2,
     "3rd Term": 3,
   };
   const currentTermId =
-    parseInt(selectedTermId) || termIdMapNumeric[selectedTerm] || 2;
+    parseInt(selectedTermId) || termIdMapNumeric[selectedTerm] || 1;
 
   const {
     data: lessons = [],
@@ -119,20 +116,25 @@ export default function TopicsScreen() {
 
     // Mapping different possible backend field names defensively
     const weeksMap: Record<number, any[]> = {};
-    lessons.forEach((lesson: any) => {
+    lessons.forEach((lesson: any, sourceIndex: number) => {
       const weekNum = lesson.weekNumber ?? lesson.week ?? 1;
       if (!weeksMap[weekNum]) weeksMap[weekNum] = [];
       weeksMap[weekNum].push({
         id: lesson.id?.toString() || Math.random().toString(),
         title: lesson.topic || lesson.title || lesson.name || "Untitled Topic",
+        strand: lesson.strand || lesson.category || null,
         completed: lesson.isCompleted ?? false,
+        // Preserve API order when an older response does not include orderIndex.
+        orderIndex: Number.isFinite(Number(lesson.orderIndex)) ? Number(lesson.orderIndex) : sourceIndex,
       });
     });
 
     const weeks: WeekData[] = Object.keys(weeksMap)
       .map((week) => ({
         weekNumber: parseInt(week),
-        topics: weeksMap[parseInt(week)],
+        topics: weeksMap[parseInt(week)]
+          .sort((a, b) => a.orderIndex - b.orderIndex)
+          .map(({ orderIndex, ...topic }) => topic),
       }))
       .sort((a, b) => a.weekNumber - b.weekNumber);
 
@@ -184,11 +186,7 @@ export default function TopicsScreen() {
     return (
       <View style={styles.container}>
         {isFocused && (
-          <StatusBar
-            style="dark"
-            backgroundColor="#FFFFFF"
-            translucent={false}
-          />
+          <StatusBar style="dark" />
         )}
         <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
           <Pressable onPress={() => router.back()} style={styles.backButton}>
@@ -212,7 +210,12 @@ export default function TopicsScreen() {
       onPress={() => handleTopicPress(topic)}
     >
       <View style={styles.topicInfo}>
-        <Text style={styles.topicTitle}>{topic.title}</Text>
+        <Text style={styles.topicTitle} numberOfLines={3}>{topic.title}</Text>
+        {!!topic.strand && (
+          <View style={styles.strandTag}>
+            <Text style={styles.strandTagText} numberOfLines={1}>{topic.strand}</Text>
+          </View>
+        )}
       </View>
       <View style={styles.statusContainer}>
         <Ionicons name="arrow-forward" size={18} color="#94A3B8" />
@@ -224,6 +227,7 @@ export default function TopicsScreen() {
     <View style={styles.weekSection}>
       <View style={styles.weekHeader}>
         <Text style={styles.weekTitle}>Week {item.weekNumber}</Text>
+        <Text style={styles.topicCount}>{item.topics.length} {item.topics.length === 1 ? "topic" : "topics"}</Text>
       </View>
       <View style={styles.topicsList}>{item.topics.map(renderTopic)}</View>
     </View>
@@ -256,7 +260,7 @@ export default function TopicsScreen() {
   return (
     <View style={styles.container}>
       {isFocused && (
-        <StatusBar style="dark" backgroundColor="#FFFFFF" translucent={false} />
+        <StatusBar style="dark" />
       )}
 
       {/* Header with Top Inset */}
@@ -498,6 +502,9 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   weekHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     marginBottom: 12,
     paddingHorizontal: 4,
   },
@@ -508,13 +515,17 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     letterSpacing: 1.2,
   },
+  topicCount: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#64748B",
+  },
   topicsList: {
     gap: 12,
   },
   topicCard: {
     flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
+    alignItems: "flex-start",
     backgroundColor: "#FFFFFF",
     paddingVertical: 18,
     paddingHorizontal: 16,
@@ -534,11 +545,27 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "700",
     color: "#1E293B",
+    lineHeight: 21,
+  },
+  strandTag: {
+    alignSelf: "flex-start",
+    maxWidth: "100%",
+    marginTop: 7,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 8,
+    backgroundColor: "#EFF6FF",
+  },
+  strandTagText: {
+    color: "#2563EB",
+    fontSize: 11,
+    fontWeight: "700",
   },
   statusContainer: {
     flexDirection: "row",
     alignItems: "center",
     marginLeft: 12,
+    marginTop: 2,
   },
   emptyContainer: {
     flex: 1,

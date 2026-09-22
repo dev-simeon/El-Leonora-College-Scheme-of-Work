@@ -80,7 +80,7 @@ export default function UpdatePhoneScreen() {
 
   return (
     <View style={styles.outerContainer}>
-      <StatusBar style="dark" backgroundColor="#FFFFFF" translucent={false} />
+      <StatusBar style="dark" />
       <SafeAreaView
         style={styles.safeAreaContent}
         edges={["left", "right"]}

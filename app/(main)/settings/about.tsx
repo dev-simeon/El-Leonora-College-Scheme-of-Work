@@ -108,7 +108,7 @@ export default function AboutScreen() {
 
   return (
     <View style={styles.outer}>
-      <StatusBar style="dark" backgroundColor="#FFFFFF" translucent={false} />
+      <StatusBar style="dark" />
       
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + 12 }]}>

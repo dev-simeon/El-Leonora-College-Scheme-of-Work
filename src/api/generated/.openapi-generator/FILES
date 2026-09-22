@@ -7,9 +7,11 @@ configuration.ts
 endpoints/academic-sessions-api.ts
 endpoints/account-api.ts
 endpoints/app-api.ts
+endpoints/attendance-api.ts
 endpoints/auth-api.ts
 endpoints/classes-api.ts
 endpoints/fees-api.ts
+endpoints/guardians-api.ts
 endpoints/lessons-api.ts
 endpoints/roles-api.ts
 endpoints/staffs-api.ts
@@ -45,6 +47,7 @@ models/class-subject-dto.ts
 models/class-teacher-dto.ts
 models/create-academic-session-request.ts
 models/create-class-fee-dto.ts
+models/create-guardian-dto.ts
 models/create-lesson-topic-dto.ts
 models/create-school-event-request.ts
 models/create-school-fee-type-dto.ts
@@ -52,6 +55,14 @@ models/create-staff-dto.ts
 models/create-student-dto.ts
 models/create-student-subscription-dto.ts
 models/create-term-dto.ts
+models/guardian-basic-dto-api-response.ts
+models/guardian-basic-dto.ts
+models/guardian-detail-dto-api-response.ts
+models/guardian-detail-dto-list-api-response.ts
+models/guardian-detail-dto.ts
+models/guardian-dto-api-paged-response.ts
+models/guardian-dto-api-response.ts
+models/guardian-dto.ts
 models/index.ts
 models/lesson-block-dto.ts
 models/lesson-detail-dto-api-response.ts
@@ -65,9 +76,11 @@ models/login-response-dto.ts
 models/no-data-response-dto-api-response.ts
 models/no-data-response-dto.ts
 models/publish-app-version-dto.ts
+models/record-student-attendance-request.ts
 models/register-student-device-dto.ts
 models/remove-staff-subjects-request.ts
 models/reset-password-dto.ts
+models/role-request-dto.ts
 models/school-event-dto-api-paged-response.ts
 models/school-event-dto-api-response.ts
 models/school-event-dto.ts
@@ -81,6 +94,7 @@ models/staff-detail-dto-api-response.ts
 models/staff-detail-dto.ts
 models/staff-dto-api-paged-response.ts
 models/staff-dto.ts
+models/staff-role-dto-list-api-response.ts
 models/staff-role-dto.ts
 models/student-basic-dto.ts
 models/student-class-dto.ts
@@ -92,7 +106,11 @@ models/student-dto-api-paged-response.ts
 models/student-dto-api-response.ts
 models/student-dto-list-api-response.ts
 models/student-dto.ts
+models/student-guardian-dto.ts
 models/student-login-request-dto.ts
+models/student-movement-response.ts
+models/student-status-response-api-response.ts
+models/student-status-response.ts
 models/student-subscription-dto-api-paged-response.ts
 models/student-subscription-dto-api-response.ts
 models/student-subscription-dto.ts
@@ -106,6 +124,7 @@ models/term-details-dto-api-response.ts
 models/term-details-dto.ts
 models/term-dto.ts
 models/update-academic-session-dto.ts
+models/update-guardian-relationship-dto.ts
 models/update-school-event-request.ts
 models/update-school-fee-type-dto.ts
 models/update-staff-dto.ts

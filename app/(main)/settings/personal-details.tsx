@@ -147,7 +147,7 @@ export default function PersonalDetailsScreen() {
   return (
     <View style={styles.safeContainer}>
       {isFocused && (
-        <StatusBar style="dark" backgroundColor="#FFFFFF" translucent={false} />
+        <StatusBar style="dark" />
       )}
 
       {/* ── Fixed Header ────────────────────────────────────────── */}

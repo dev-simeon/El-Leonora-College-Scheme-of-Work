@@ -55,7 +55,7 @@ export default function HelpSupportScreen() {
 
   return (
     <SafeAreaView style={styles.safeContainer} edges={["left", "right"]}>
-      <StatusBar style="dark" backgroundColor="#FFFFFF" translucent={false} />
+      <StatusBar style="dark" />
       <View style={styles.container}>
         {/* Header */}
         <View style={[styles.header, { paddingTop: insets.top + 12 }]}>

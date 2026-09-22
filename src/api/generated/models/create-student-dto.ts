@@ -13,6 +13,9 @@
  */
 
 
+// May contain unused imports in some cases
+// @ts-ignore
+import type { StudentGuardianDto } from './student-guardian-dto';
 
 /**
  * 
@@ -20,12 +23,6 @@
  * @interface CreateStudentDto
  */
 export interface CreateStudentDto {
-    /**
-     * 
-     * @type {string}
-     * @memberof CreateStudentDto
-     */
-    'admissionNumber'?: string;
     /**
      * 
      * @type {number}
@@ -62,6 +59,12 @@ export interface CreateStudentDto {
      * @memberof CreateStudentDto
      */
     'department'?: string | null;
+    /**
+     * 
+     * @type {StudentGuardianDto}
+     * @memberof CreateStudentDto
+     */
+    'guardian'?: StudentGuardianDto;
 }
 
 /**

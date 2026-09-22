@@ -98,11 +98,7 @@ export default function MyTicketsScreen() {
 
   return (
     <View style={styles.outerContainer}>
-      <StatusBar
-        style="dark"
-        backgroundColor="#FFFFFF"
-        translucent={false}
-      />
+      <StatusBar style="dark" />
       <SafeAreaView style={styles.safeContainer} edges={["left", "right"]}>
         <View style={styles.container}>
           {/* Header */}

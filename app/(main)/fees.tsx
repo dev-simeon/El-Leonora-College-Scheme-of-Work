@@ -310,7 +310,7 @@ export default function FeesScreen() {
   return (
     <View style={styles.container}>
       {isFocused && (
-        <StatusBar style="light" backgroundColor="transparent" translucent />
+        <StatusBar style="light" />
       )}
 
       <ScrollView

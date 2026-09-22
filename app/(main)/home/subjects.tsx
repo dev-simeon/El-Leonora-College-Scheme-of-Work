@@ -25,7 +25,10 @@ import { useToast } from "../../../src/context/ToastContext";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "../../../src/context/AuthContext";
 import { StudentsApi } from "../../../src/api/generated/endpoints/students-api";
-import { getApiErrorMessage, getRequestErrorMessage } from "../../../src/utils/apiError";
+import {
+  getApiErrorMessage,
+  getRequestErrorMessage,
+} from "../../../src/utils/apiError";
 
 // ─── API Client ──────────────────────────────────────────────────────────────
 const accountApi = new AccountApi(
@@ -168,9 +171,6 @@ export default function SchemesScreen() {
         classId,
         name,
         classCode: classCode,
-        termId: user?.currentTermId || "2",
-        term: user?.currentTerm || "2nd Term",
-        session: user?.currentSession || "2025/26 Session",
       },
     });
   };
@@ -208,7 +208,7 @@ export default function SchemesScreen() {
 
   return (
     <View style={styles.container}>
-      {isFocused && <StatusBar style="dark" translucent />}
+      {isFocused && <StatusBar style="dark" />}
       <DashboardHeader />
 
       <View style={styles.mainContent}>
@@ -227,55 +227,55 @@ export default function SchemesScreen() {
             </Pressable>
           </View>
         ) : (
-            <FlatList
-              data={subjects}
-              renderItem={renderSubjectItem}
-              keyExtractor={(item) => `${item.id}-${item.classId}`}
-              numColumns={2}
-              columnWrapperStyle={styles.columnWrapper}
-              refreshControl={
-                <RefreshControl
-                  refreshing={isRefetching}
-                  onRefresh={onRefresh}
-                  tintColor={COLORS.primary}
-                />
+          <FlatList
+            data={subjects}
+            renderItem={renderSubjectItem}
+            keyExtractor={(item) => `${item.id}-${item.classId}`}
+            numColumns={2}
+            columnWrapperStyle={styles.columnWrapper}
+            refreshControl={
+              <RefreshControl
+                refreshing={isRefetching}
+                onRefresh={onRefresh}
+                tintColor={COLORS.primary}
+              />
+            }
+            onEndReached={() => {
+              if (hasNextPage && !isFetchingNextPage) {
+                fetchNextPage();
               }
-              onEndReached={() => {
-                if (hasNextPage && !isFetchingNextPage) {
-                  fetchNextPage();
-                }
-              }}
-              onEndReachedThreshold={0.5}
-              contentContainerStyle={[
-                styles.gridContent,
-                {
-                  paddingBottom: insets.bottom + 40,
-                  paddingHorizontal: 16,
-                },
-              ]}
-              showsVerticalScrollIndicator={false}
-              ListHeaderComponent={
-                <View style={styles.sectionHeader}>
-                  <Text style={styles.headerTitle}>My Subjects</Text>
+            }}
+            onEndReachedThreshold={0.5}
+            contentContainerStyle={[
+              styles.gridContent,
+              {
+                paddingBottom: insets.bottom + 40,
+                paddingHorizontal: 16,
+              },
+            ]}
+            showsVerticalScrollIndicator={false}
+            ListHeaderComponent={
+              <View style={styles.sectionHeader}>
+                <Text style={styles.headerTitle}>My Subjects</Text>
+              </View>
+            }
+            ListFooterComponent={
+              isFetchingNextPage ? (
+                <View style={styles.loaderFooter}>
+                  <ActivityIndicator size="small" color={COLORS.primary} />
                 </View>
-              }
-              ListFooterComponent={
-                isFetchingNextPage ? (
-                  <View style={styles.loaderFooter}>
-                    <ActivityIndicator size="small" color={COLORS.primary} />
-                  </View>
-                ) : null
-              }
-              ListEmptyComponent={
-                !isLoading && !isRefetching ? (
-                  <View style={styles.emptyContainer}>
-                    <Text style={styles.emptyText}>
-                      No subjects assigned to you yet.
-                    </Text>
-                  </View>
-                ) : null
-              }
-            />
+              ) : null
+            }
+            ListEmptyComponent={
+              !isLoading && !isRefetching ? (
+                <View style={styles.emptyContainer}>
+                  <Text style={styles.emptyText}>
+                    No subjects assigned to you yet.
+                  </Text>
+                </View>
+              ) : null
+            }
+          />
         )}
       </View>
     </View>

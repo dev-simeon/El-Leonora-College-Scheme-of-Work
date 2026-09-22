@@ -295,7 +295,7 @@ export const AuthApiFp = function(configuration?: Configuration) {
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        async refreshToken(refreshToken?: string, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<void>> {
+        async refreshToken(refreshToken?: string, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<LoginResponseDtoApiResponse>> {
             const localVarAxiosArgs = await localVarAxiosParamCreator.refreshToken(refreshToken, options);
             const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
             const localVarOperationServerBasePath = operationServerMap['AuthApi.refreshToken']?.[localVarOperationServerIndex]?.url;
@@ -307,7 +307,7 @@ export const AuthApiFp = function(configuration?: Configuration) {
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        async resetPassword(resetPasswordDto?: ResetPasswordDto, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<void>> {
+        async resetPassword(resetPasswordDto?: ResetPasswordDto, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<NoDataResponseDtoApiResponse>> {
             const localVarAxiosArgs = await localVarAxiosParamCreator.resetPassword(resetPasswordDto, options);
             const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
             const localVarOperationServerBasePath = operationServerMap['AuthApi.resetPassword']?.[localVarOperationServerIndex]?.url;
@@ -370,7 +370,7 @@ export const AuthApiFactory = function (configuration?: Configuration, basePath?
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        refreshToken(requestParameters: AuthApiRefreshTokenRequest = {}, options?: RawAxiosRequestConfig): AxiosPromise<void> {
+        refreshToken(requestParameters: AuthApiRefreshTokenRequest = {}, options?: RawAxiosRequestConfig): AxiosPromise<LoginResponseDtoApiResponse> {
             return localVarFp.refreshToken(requestParameters.refreshToken, options).then((request) => request(axios, basePath));
         },
         /**
@@ -379,7 +379,7 @@ export const AuthApiFactory = function (configuration?: Configuration, basePath?
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        resetPassword(requestParameters: AuthApiResetPasswordRequest = {}, options?: RawAxiosRequestConfig): AxiosPromise<void> {
+        resetPassword(requestParameters: AuthApiResetPasswordRequest = {}, options?: RawAxiosRequestConfig): AxiosPromise<NoDataResponseDtoApiResponse> {
             return localVarFp.resetPassword(requestParameters.resetPasswordDto, options).then((request) => request(axios, basePath));
         },
         /**

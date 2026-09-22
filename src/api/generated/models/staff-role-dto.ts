@@ -22,12 +22,6 @@
 export interface StaffRoleDto {
     /**
      * 
-     * @type {number}
-     * @memberof StaffRoleDto
-     */
-    'roleId'?: number;
-    /**
-     * 
      * @type {string}
      * @memberof StaffRoleDto
      */

@@ -18,6 +18,7 @@ import { AccountApi } from "../../api/generated/endpoints/account-api";
 import { Configuration } from "../../api/generated/configuration";
 import api, { API_BASE_URL } from "../../services/api";
 import { getApiErrorMessage } from "../../utils/apiError";
+import { UpcomingActivitiesCard } from "./UpcomingActivitiesCard";
 
 // ─── API Clients ──────────────────────────────────────────────────────────────
 const accountApi = new AccountApi(
@@ -74,7 +75,7 @@ export default function StudentDashboard() {
 
   return (
     <View style={styles.container}>
-      <StatusBar style="dark" translucent backgroundColor="transparent" />
+      <StatusBar style="dark" />
       
       {/* Top Header */}
       <View
@@ -187,32 +188,7 @@ export default function StudentDashboard() {
         </View>
 
         {/* 3. Upcoming Activities */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Upcoming Activities</Text>
-          <Pressable style={styles.activityCard} onPress={() => setActivitiesModalVisible(true)}>
-            <View style={styles.activityLeft}>
-              <View style={styles.activityIcon}>
-                <Ionicons name="timer-outline" size={24} color="#FFF" />
-              </View>
-              <View>
-                <Text style={styles.activityTitle}>Science Mid-term</Text>
-                <Text style={styles.activitySubtitle}>Room 1C • Comprehensive Exam</Text>
-              </View>
-            </View>
-            
-            <View style={styles.countdownContainer}>
-              <View style={styles.countdownItem}>
-                <Text style={styles.countdownValue}>03</Text>
-                <Text style={styles.countdownLabel}>Days</Text>
-              </View>
-              <Text style={styles.countdownDivider}>:</Text>
-              <View style={styles.countdownItem}>
-                <Text style={styles.countdownValue}>14</Text>
-                <Text style={styles.countdownLabel}>Hrs</Text>
-              </View>
-            </View>
-          </Pressable>
-        </View>
+        <UpcomingActivitiesCard />
 
         {/* 4. Quick Actions */}
         <View style={styles.section}>
@@ -375,7 +351,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingHorizontal: 24,
+    paddingHorizontal: 10,
     paddingBottom: 16,
     backgroundColor: "rgba(248, 249, 250, 0.9)",
     zIndex: 10,
@@ -416,7 +392,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 10,
     paddingTop: 8,
     gap: 24,
   },
@@ -862,4 +838,3 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
 });
-

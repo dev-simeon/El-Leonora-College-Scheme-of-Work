@@ -18,6 +18,7 @@ import { AccountApi } from "../../api/generated/endpoints/account-api";
 import { Configuration } from "../../api/generated/configuration";
 import api, { API_BASE_URL } from "../../services/api";
 import { getApiErrorMessage } from "../../utils/apiError";
+import { UpcomingActivitiesCard } from "./UpcomingActivitiesCard";
 
 // ─── API Clients ──────────────────────────────────────────────────────────────
 const accountApi = new AccountApi(
@@ -73,7 +74,7 @@ export default function TeacherDashboard() {
 
   return (
     <View style={styles.container}>
-      <StatusBar style="dark" translucent backgroundColor="transparent" />
+      <StatusBar style="dark" />
       
       {/* Top Header */}
       <View
@@ -175,6 +176,8 @@ export default function TeacherDashboard() {
             </View>
           </Pressable>
         </View>
+
+        <UpcomingActivitiesCard />
 
         {/* 3. Quick Actions */}
         <View style={styles.section}>
@@ -282,7 +285,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingHorizontal: 24,
+    paddingHorizontal: 10,
     paddingBottom: 16,
     backgroundColor: "rgba(248, 249, 250, 0.9)",
     zIndex: 10,
@@ -323,7 +326,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 10,
     paddingTop: 8,
     gap: 24,
   },

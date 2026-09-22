@@ -1,0 +1,390 @@
+<!DOCTYPE html><html lang="en" style=""><head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Download Mobile App - EL-Leonora Admin Portal</title>
+  <!-- Google Fonts & Material Symbols -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+  <link href="https://fonts.googleapis.com/css2?family=Lexend:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Lexend', 'sans-serif'],
+          },
+          colors: {
+            brand: {
+              50: '#eef4ff',
+              100: '#d9e6ff',
+              500: '#135bec',
+              600: '#0d48cc',
+              700: '#0a359e',
+            },
+            navy: {
+              900: '#0f172a',
+              800: '#1e293b',
+              700: '#334155',
+              600: '#475569',
+              500: '#64748b',
+            },
+            surface: {
+              bg: '#f8fafc',
+              card: '#ffffff',
+              subtle: '#f1f5f9',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    .material-symbols-outlined {
+      font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      vertical-align: middle;
+    }
+    .icon-filled {
+      font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+    }
+  </style>
+</head>
+<body class="bg-surface-bg text-navy-900 font-sans antialiased min-h-screen flex flex-col md:flex-row">
+
+  <!-- Persistent Left Sidebar matching EL-Leonora portal -->
+  <aside class="w-full md:w-64 bg-white border-r border-slate-200 flex-shrink-0 flex flex-col justify-between p-5 min-h-screen">
+    <div class="space-y-6">
+      <!-- School Brand -->
+      <div class="flex items-center gap-3 px-2 py-1">
+        <div class="w-10 h-10 rounded-xl bg-brand-500 flex items-center justify-center text-white font-bold text-lg shadow-sm">
+          EL
+        </div>
+        <div>
+          <h1 class="font-bold text-navy-900 text-base leading-tight">EL-Leonora</h1>
+          <p class="text-xs font-medium text-navy-500">Admin Portal</p>
+        </div>
+      </div>
+
+      <!-- Quick Action / Search -->
+      <div class="relative">
+        <span class="material-symbols-outlined absolute left-3 top-2.5 text-slate-400 text-sm">search</span>
+        <input type="text" placeholder="Search menu..." class="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none focus:border-brand-500 transition text-navy-800">
+      </div>
+
+      <!-- Navigation Links -->
+      <nav class="space-y-1 text-sm font-medium">
+        <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-navy-600 hover:bg-slate-50 hover:text-navy-900 transition">
+          <span class="material-symbols-outlined text-lg">dashboard</span>
+          Dashboard
+        </a>
+        <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-navy-600 hover:bg-slate-50 hover:text-navy-900 transition">
+          <span class="material-symbols-outlined text-lg">calendar_today</span>
+          Timetable
+        </a>
+        <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-navy-600 hover:bg-slate-50 hover:text-navy-900 transition">
+          <span class="material-symbols-outlined text-lg">school</span>
+          Academic
+        </a>
+        <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-navy-600 hover:bg-slate-50 hover:text-navy-900 transition">
+          <span class="material-symbols-outlined text-lg">group</span>
+          Teachers
+        </a>
+        <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-navy-600 hover:bg-slate-50 hover:text-navy-900 transition">
+          <span class="material-symbols-outlined text-lg">auto_awesome</span>
+          AI Generator
+        </a>
+        <!-- Active Nav Item -->
+        <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-brand-50 text-brand-600 font-semibold border-l-4 border-brand-500 transition"><span class="material-symbols-outlined text-lg icon-filled text-brand-500">layers</span>
+          App Versions</a>
+        <a href="#" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-navy-600 hover:bg-slate-50 hover:text-navy-900 transition">
+          <span class="material-symbols-outlined text-lg">settings</span>
+          Settings
+        </a>
+      </nav>
+    </div>
+
+    <!-- Sidebar Bottom / Support & Profile -->
+    <div class="pt-6 border-t border-slate-200 space-y-3">
+      <div class="bg-slate-50 p-3 rounded-xl border border-slate-200">
+        <div class="flex items-center gap-2 text-xs font-semibold text-navy-700 mb-1">
+          <span class="material-symbols-outlined text-brand-500 text-base">verified_user</span>
+          Staff Portal Build
+        </div>
+        <p class="text-[11px] text-navy-500 leading-relaxed">Android v1.0.0 released for internal school operations.</p>
+      </div>
+
+      <a href="#" class="flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium text-navy-600 hover:bg-slate-50 transition">
+        <span class="material-symbols-outlined text-base">help_outline</span>
+        Help &amp; Documentation
+      </a>
+      <a href="#" class="flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium text-red-600 hover:bg-red-50 transition">
+        <span class="material-symbols-outlined text-base">logout</span>
+        Sign Out
+      </a>
+    </div>
+  </aside>
+
+  <!-- Main Content Area -->
+  <main class="flex-1 flex flex-col min-w-0 bg-[#f8fafc]">
+    <!-- Top Bar -->
+    <header class="h-16 bg-white border-b border-slate-200 px-6 sm:px-8 flex items-center justify-between sticky top-0 z-30">
+      <div class="flex items-center gap-3">
+        <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">Institutional Portal</span>
+        <span class="text-slate-300">/</span>
+        <span class="text-sm font-medium text-navy-700">Staff Tools</span>
+        <span class="text-slate-300">/</span>
+        <span class="text-sm font-semibold text-brand-600">App Versions</span>
+      </div>
+
+      <div class="flex items-center gap-4">
+        <button class="relative p-2 text-navy-500 hover:text-navy-800 rounded-full hover:bg-slate-100 transition" title="Notifications">
+          <span class="material-symbols-outlined text-xl">notifications</span>
+          <span class="absolute top-1.5 right-1.5 w-2 h-2 bg-brand-500 rounded-full"></span>
+        </button>
+        <button class="p-2 text-navy-500 hover:text-navy-800 rounded-full hover:bg-slate-100 transition" title="Portal Help">
+          <span class="material-symbols-outlined text-xl">help</span>
+        </button>
+        <div class="h-6 w-px bg-slate-200"></div>
+        <div class="flex items-center gap-3 pl-1">
+          <div class="w-8 h-8 rounded-full bg-slate-100 border border-slate-300 flex items-center justify-center font-bold text-xs text-navy-700 overflow-hidden">
+            <span class="material-symbols-outlined text-slate-500 text-lg">person</span>
+          </div>
+          <div class="hidden sm:block text-left">
+            <p class="text-xs font-semibold text-navy-800 leading-none">Admin Workspace</p>
+            <p class="text-[10px] text-navy-500 mt-0.5">Staff Clearance Level 4</p>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Page Body -->
+    <div class="p-6 sm:p-8 w-full space-y-8 max-w-4xl">
+
+      <!-- Header Banner & State Switcher (Interactive Preview Bar) -->
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-slate-200">
+        <div>
+          
+          <h1 class="text-2xl sm:text-3xl font-bold text-navy-900 tracking-tight">App Versions</h1>
+          <p class="text-sm sm:text-base text-navy-600 mt-1">Download institutional applications for mobile and desktop workstations.</p>
+        </div>
+
+        <!-- UI State Demonstration Switcher -->
+        
+      </div>
+
+      <!-- MAIN DOWNLOAD CARD -->
+      <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden p-6 sm:p-8 transition-all">
+
+        <!-- 1. Normal Ready State -->
+        <div id="state-ready" class="grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+          <!-- Left: Phone Mockup / Android Visual -->
+          
+
+          <!-- Right: App Details & Action -->
+          <div class="space-y-6">
+            <div class="flex items-start gap-4">
+              <div class="w-16 h-16 rounded-2xl bg-brand-50 border border-brand-100 flex items-center justify-center flex-shrink-0 text-brand-600">
+                <span class="material-symbols-outlined text-4xl">android</span>
+              </div>
+              <div>
+                <div class="flex items-center gap-2">
+                  <h2 class="text-xl sm:text-2xl font-bold text-navy-900">EL-Leonora School App</h2>
+                  <span class="px-2 py-0.5 text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-md">Android APK</span>
+                </div>
+                <p class="text-sm text-navy-600 mt-1">
+                  Access institutional records, manage attendance routines, and receive real-time academic announcements on your mobile device.
+                </p>
+              </div>
+            </div>
+
+            <!-- Version Meta Attributes -->
+            <div class="grid grid-cols-3 gap-3 py-3 border-y border-slate-100 text-xs">
+              <div>
+                <span class="block text-slate-400 font-medium">Version</span>
+                <span class="font-semibold text-navy-800 text-sm">Version 1.0.0</span>
+              </div>
+              <div>
+                <span class="block text-slate-400 font-medium">Package Size</span>
+                <span class="font-semibold text-navy-800 text-sm">Approx. 45 MB</span>
+              </div>
+              <div>
+                <span class="block text-slate-400 font-medium">Release Date</span>
+                <span class="font-semibold text-navy-800 text-sm">Updated September 2026</span>
+              </div>
+            </div>
+
+            <!-- CTA Actions -->
+            <div class="flex flex-wrap items-center gap-4 pt-1">
+              <button onclick="startDownloadSimulation()" class="inline-flex items-center justify-center gap-2 px-6 py-3.5 bg-brand-500 hover:bg-brand-600 active:scale-[0.99] text-white font-semibold text-sm rounded-xl shadow-sm hover:shadow transition-all duration-150"><span class="material-symbols-outlined text-xl">download</span>Download for Windows (.exe)</button>
+
+              
+            </div>
+
+            <!-- Additional Staff Note -->
+            <p class="text-xs text-slate-500 flex items-center gap-1.5 pt-1"><span class="material-symbols-outlined text-sm text-slate-400">info</span>Requires Windows 10/11 (64-bit).</p>
+          </div>
+        </div>
+
+        <!-- 2. Download In-Progress State -->
+        <div id="state-downloading" class="hidden py-8 px-4 text-center max-w-lg mx-auto space-y-5">
+          <div class="w-16 h-16 rounded-full bg-brand-50 text-brand-600 flex items-center justify-center mx-auto animate-pulse">
+            <span class="material-symbols-outlined text-3xl">cloud_download</span>
+          </div>
+          <div>
+            <h3 class="text-xl font-bold text-navy-900">Downloading EL-Leonora APK...</h3>
+            <p class="text-xs text-navy-500 mt-1">Please keep this browser window open while your package is securely retrieved.</p>
+          </div>
+          
+          <div class="space-y-2">
+            <div class="flex justify-between text-xs font-semibold text-navy-700">
+              <span id="download-progress-text" class="">68% completed</span>
+              <span class="text-slate-500">30.6 MB / 45.0 MB</span>
+            </div>
+            <div class="w-full h-3 bg-slate-100 rounded-full overflow-hidden">
+              <div id="download-bar" class="h-full bg-brand-500 rounded-full transition-all duration-300 ease-out" style="width: 68%;"></div>
+            </div>
+            <div class="flex justify-between text-[11px] text-slate-400">
+              <span class="">Transfer rate: ~4.2 MB/s</span>
+              <span class="">Est. time remaining: 3 seconds</span>
+            </div>
+          </div>
+
+          <div class="pt-2">
+            <button onclick="switchState('ready')" class="px-4 py-2 border border-slate-200 text-xs font-medium text-navy-600 hover:bg-slate-50 rounded-lg transition">
+              Cancel Download
+            </button>
+          </div>
+        </div>
+
+        <!-- 3. Download Completed State -->
+        <div id="state-completed" class="hidden py-6 px-4 text-center max-w-lg mx-auto space-y-5">
+          <div class="w-16 h-16 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-100 flex items-center justify-center mx-auto shadow-xs">
+            <span class="material-symbols-outlined text-3xl icon-filled">check_circle</span>
+          </div>
+          <div>
+            <h3 class="text-xl font-bold text-navy-900">Download Complete</h3>
+            <p class="text-xs text-navy-600 mt-1">
+              File <code class="bg-slate-100 px-1.5 py-0.5 rounded text-navy-800 font-mono text-[11px]">el-leonora-v1.0.0.apk</code> (45 MB) has been saved to your downloads folder.
+            </p>
+          </div>
+
+          <div class="bg-emerald-50/70 border border-emerald-200 rounded-xl p-3.5 text-xs text-emerald-800 text-left flex items-start gap-2.5">
+            <span class="material-symbols-outlined text-emerald-600 text-lg flex-shrink-0">install_mobile</span>
+            <span class="">Next step: Open your device notification bar or Downloads folder, tap the APK, and confirm installation.</span>
+          </div>
+
+          <div class="flex items-center justify-center gap-3 pt-2">
+            <button onclick="switchState('ready')" class="px-5 py-2.5 bg-brand-500 hover:bg-brand-600 text-white text-xs font-semibold rounded-xl shadow-xs transition"><span class="material-symbols-outlined text-xl">download</span>Download for Windows (.exe)</button>
+            <button onclick="scrollToGuide()" class="px-5 py-2.5 border border-slate-200 hover:bg-slate-50 text-navy-700 text-xs font-medium rounded-xl transition">
+              View Installation Steps
+            </button>
+          </div>
+        </div>
+
+        <!-- 4. APK Unavailable State -->
+        <div id="state-unavailable" class="hidden py-8 px-4 text-center max-w-md mx-auto space-y-4">
+          <div class="w-16 h-16 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center mx-auto">
+            <span class="material-symbols-outlined text-3xl">build_circle</span>
+          </div>
+          <div>
+            <h3 class="text-xl font-bold text-navy-900">No Mobile App Version Available</h3>
+            <p class="text-xs text-navy-600 mt-1.5 leading-relaxed">
+              No mobile app version is available right now. The IT department is currently deploying scheduled security updates for the internal package.
+            </p>
+          </div>
+          <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-navy-500">
+            Expected availability: Within 24 hours. You can continue using the web portal in the meantime.
+          </div>
+          <div class="pt-2">
+            <button onclick="switchState('ready')" class="px-4 py-2 border border-slate-300 text-xs font-medium text-navy-700 hover:bg-slate-50 rounded-lg transition">
+              Check Again
+            </button>
+          </div>
+        </div>
+
+      </div><div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden p-6 sm:p-8 transition-all"><div class="space-y-6"><div class="flex items-start gap-4"><div class="w-16 h-16 rounded-2xl bg-brand-50 border border-brand-100 flex items-center justify-center flex-shrink-0 text-brand-600"><svg class="w-8 h-8 text-brand-600 fill-current" viewBox="0 0 88 88" xmlns="http://www.w3.org/2000/svg"><path d="M0 12.402l35.687-4.86.016 34.423-35.67.202zm35.67 33.529l.028 34.453L.028 75.48.016 45.729zm4.326-39.027L87.914 0v41.528l-47.918.375zm47.918 43.629L87.914 88l-47.918-6.756v-34.93z"></path></svg></div><div><div class="flex items-center gap-2 flex-wrap"><h2 class="text-xl sm:text-2xl font-bold text-navy-900">EL-Leonora Desktop App</h2><span class="px-2 py-0.5 text-[11px] font-semibold bg-brand-50 text-brand-600 border border-brand-100 rounded-md">Windows</span></div><p class="text-sm text-navy-600 mt-1">Access the full administrative suite, offline report generation, and multi-window workspace directly on your PC or Mac.</p></div></div><div class="grid grid-cols-3 gap-3 py-3 border-y border-slate-100 text-xs"><div><span class="block text-slate-400 font-medium">Version</span><span class="font-semibold text-navy-800 text-sm">Version 2.1.0</span></div><div><span class="block text-slate-400 font-medium">Package Size</span><span class="font-semibold text-navy-800 text-sm">Approx. 118 MB</span></div><div><span class="block text-slate-400 font-medium">Release Date</span><span class="font-semibold text-navy-800 text-sm">Updated October 2026</span></div></div><div class="flex flex-wrap items-center gap-3 pt-1"><button class="inline-flex items-center justify-center gap-2 px-6 py-3.5 bg-brand-500 hover:bg-brand-600 active:scale-[0.99] text-white font-semibold text-sm rounded-xl shadow-sm hover:shadow transition-all duration-150"><span class="material-symbols-outlined text-xl">download</span>Download for Windows (.exe / .msi)</button></div><p class="text-xs text-slate-500 flex items-center gap-1.5 pt-1"><span class="material-symbols-outlined text-sm text-slate-400">info</span>Requires Windows 10/11 (64-bit).</p></div></div>
+
+      <!-- INSTALLATION STEPS SECTION -->
+      
+
+      <!-- SECURITY NOTICE CARD -->
+      
+
+      <!-- OPTIONAL SUPPORT LINK FOOTER -->
+      <div class="text-center pt-2 pb-6 border-t border-slate-200">
+        <p class="text-xs sm:text-sm text-navy-600">
+          Need help installing the app? 
+          <a href="#" class="font-semibold text-brand-600 hover:text-brand-700 underline underline-offset-4 hover:no-underline ml-1 inline-flex items-center gap-1">
+            Contact school support
+            <span class="material-symbols-outlined text-xs">north_east</span>
+          </a>
+        </p>
+        <p class="text-[11px] text-slate-400 mt-1">
+          EL-Leonora College IT Helpdesk: Ext. 402 • it-support@elleonora.edu
+        </p>
+      </div>
+
+    </div>
+  </main>
+
+  <!-- Interactive JavaScript for Tab States and Download Simulation -->
+  <script>
+    function switchState(state) {
+      // Hide all states
+      document.getElementById('state-ready').classList.add('hidden');
+      document.getElementById('state-downloading').classList.add('hidden');
+      document.getElementById('state-completed').classList.add('hidden');
+      document.getElementById('state-unavailable').classList.add('hidden');
+
+      // Reset state switcher buttons style
+      const buttons = ['ready', 'downloading', 'completed', 'unavailable'];
+      buttons.forEach(btn => {
+        const el = document.getElementById('btn-' + btn);
+        el.className = 'px-2.5 py-1 rounded-lg font-medium text-navy-600 hover:bg-slate-100 transition';
+      });
+
+      // Highlight active button
+      const activeBtn = document.getElementById('btn-' + state);
+      activeBtn.className = 'px-2.5 py-1 rounded-lg font-medium bg-brand-500 text-white shadow-xs transition';
+
+      // Show selected state
+      document.getElementById('state-' + state).classList.remove('hidden');
+    }
+
+    function startDownloadSimulation() {
+      switchState('downloading');
+      let progress = 0;
+      const bar = document.getElementById('download-bar');
+      const text = document.getElementById('download-progress-text');
+      bar.style.width = '0%';
+      text.innerText = '0% completed';
+
+      const interval = setInterval(() => {
+        progress += 20;
+        if (progress > 100) {
+          progress = 100;
+          clearInterval(interval);
+          setTimeout(() => {
+            switchState('completed');
+          }, 400);
+        }
+        bar.style.width = progress + '%';
+        const downloadedMB = ((progress / 100) * 45).toFixed(1);
+        text.innerText = progress + '% completed (' + downloadedMB + ' MB / 45.0 MB)';
+      }, 350);
+    }
+
+    function scrollToGuide() {
+      document.getElementById('installation-guide').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    function openReleaseNotes() {
+      alert("EL-Leonora Mobile App v1.0.0 Release Notes:\n\n• Initial production deployment for staff and teachers.\n• Real-time synchronization with Academic Timetables and Daily Class Rosters.\n• Offline exam attendance marking mode.\n• Secure biometric login for verified faculty.\n• Zero telemetry tracking; strictly private institutional intranet access.");
+    }
+  </script>
+
+
+
+
+</body></html>

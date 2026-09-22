@@ -2,6 +2,7 @@ export interface Topic {
   id: string;
   title: string;
   completed: boolean;
+  strand?: string | null;
 }
 
 export interface WeekData {

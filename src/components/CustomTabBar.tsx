@@ -75,8 +75,9 @@ export function CustomTabBar({
         {state.routes.map((route, index) => {
           const { options } = descriptors[route.key];
 
-          // Attendance is shared; fees remains student-only.
+          // Attendance is a staff/admin tool; fees remains student-only.
           if (route.name === "index" || (options as any).href === null) return null;
+          if (isStudent && route.name === "attendance") return null;
           if (!isStudent && route.name === "fees") return null;
 
           const label =

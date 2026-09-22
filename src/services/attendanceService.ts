@@ -14,8 +14,15 @@ export interface AttendanceResponse {
   message: string;
 }
 
+export interface ManualAttendanceRecord {
+  classId: string;
+  studentIds: string[];
+  timestamp: Date;
+}
+
 const MOCK_DELAY_MS = 1000;
 const attendanceLogs = new Map<string, AttendanceLog[]>();
+const manualAttendance = new Map<string, ManualAttendanceRecord>();
 const delay = () => new Promise<void>((resolve) => setTimeout(resolve, MOCK_DELAY_MS));
 const getLogs = (userId: string) => attendanceLogs.get(userId) ?? [];
 
@@ -53,5 +60,16 @@ export const AttendanceService = {
   getLatestLog(userId: string): AttendanceLog | undefined {
     const logs = getLogs(userId);
     return logs[logs.length - 1];
+  },
+
+  async saveManualAttendance(classId: string, studentIds: string[]): Promise<ManualAttendanceRecord> {
+    await delay();
+    const record = { classId, studentIds: [...studentIds], timestamp: new Date() };
+    manualAttendance.set(classId, record);
+    return record;
+  },
+
+  getManualAttendance(classId: string): ManualAttendanceRecord | undefined {
+    return manualAttendance.get(classId);
   },
 };

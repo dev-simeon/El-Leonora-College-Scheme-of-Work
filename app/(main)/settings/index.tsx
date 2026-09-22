@@ -195,7 +195,7 @@ export default function SettingsScreen() {
   return (
     <SafeAreaView style={styles.safeContainer} edges={["left", "right"]}>
       {isFocused && (
-        <StatusBar style="light" backgroundColor="transparent" translucent />
+        <StatusBar style="light" />
       )}
 
       <ScrollView
