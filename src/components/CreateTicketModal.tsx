@@ -54,6 +54,9 @@ export default function CreateTicketModal({
   const insets = useSafeAreaInsets();
   const [subject, setSubject] = useState("");
   const [description, setDescription] = useState("");
+  const [focusedField, setFocusedField] = useState<
+    "subject" | "description" | null
+  >(null);
 
   const handleSubmit = () => {
     if (subject.trim() && description.trim()) {
@@ -80,6 +83,7 @@ export default function CreateTicketModal({
           style={styles.overlayTouchable}
           activeOpacity={1}
           onPress={onClose}
+          accessibilityLabel="Close ticket modal"
         />
         <View style={styles.modalContainer}>
           {/* Drag Handle */}
@@ -102,29 +106,59 @@ export default function CreateTicketModal({
           {/* Content */}
           <View style={styles.content}>
             {/* Subject Input */}
-            <View style={styles.inputContainer}>
+            <View
+              style={[
+                styles.inputContainer,
+                focusedField === "subject" && styles.inputContainerFocused,
+              ]}
+            >
               <Text style={styles.label}>Ticket subject</Text>
               <TextInput
-                style={styles.input}
+                style={[
+                  styles.input,
+                  Platform.OS === "web" && ({ outline: "none" } as any),
+                ]}
                 placeholder="e.g., Billing, Technical Issue"
                 placeholderTextColor="#9CA3AF"
                 value={subject}
                 onChangeText={setSubject}
+                onFocus={() => setFocusedField("subject")}
+                onBlur={() =>
+                  setFocusedField((current) =>
+                    current === "subject" ? null : current,
+                  )
+                }
+                selectionColor="#135BEC"
               />
             </View>
 
             {/* Description Input */}
-            <View style={styles.inputContainer}>
+            <View
+              style={[
+                styles.inputContainer,
+                focusedField === "description" && styles.inputContainerFocused,
+              ]}
+            >
               <Text style={styles.label}>Describe your issue</Text>
               <TextInput
-                style={styles.textArea}
+                style={[
+                  styles.textArea,
+                  Platform.OS === "web" && ({ outline: "none" } as any),
+                ]}
                 multiline
                 numberOfLines={8}
                 placeholder=""
                 placeholderTextColor="#9CA3AF"
                 value={description}
                 onChangeText={setDescription}
+                onFocus={() => setFocusedField("description")}
+                onBlur={() =>
+                  setFocusedField((current) =>
+                    current === "description" ? null : current,
+                  )
+                }
                 textAlignVertical="top"
+                selectionColor="#135BEC"
               />
             </View>
 
@@ -144,7 +178,12 @@ export default function CreateTicketModal({
           </View>
 
           {/* Footer */}
-          <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 24) }]}>
+          <View
+            style={[
+              styles.footer,
+              { paddingBottom: Math.max(insets.bottom, 24) },
+            ]}
+          >
             <TouchableOpacity
               style={styles.submitButton}
               onPress={handleSubmit}
@@ -170,6 +209,7 @@ const styles = StyleSheet.create({
   },
   overlayTouchable: {
     flex: 1,
+    backgroundColor: "rgba(0,0,0,0.4)",
   },
   modalContainer: {
     backgroundColor: "#FFFFFF",
@@ -212,6 +252,8 @@ const styles = StyleSheet.create({
   },
   closeButton: {
     padding: 6,
+    minWidth: 40,
+    minHeight: 40,
     borderRadius: 9999,
     backgroundColor: "#F3F4F6",
     justifyContent: "center",
@@ -225,6 +267,14 @@ const styles = StyleSheet.create({
   },
   inputContainer: {
     gap: 8,
+  },
+  inputContainerFocused: {
+    borderRadius: 12,
+    shadowColor: "#135BEC",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 2,
   },
   label: {
     fontSize: 14,

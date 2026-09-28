@@ -24,7 +24,7 @@ export default function ActivationScreen() {
   const [code, setCode] = useState(["", "", "", ""]);
   const [isLoading, setIsLoading] = useState(false);
   const [timer, setTimer] = useState(59);
-  
+
   const inputRefs = [
     useRef<TextInput>(null),
     useRef<TextInput>(null),
@@ -39,7 +39,7 @@ export default function ActivationScreen() {
     Animated.timing(fadeAnim, {
       toValue: 1,
       duration: 1000,
-      useNativeDriver: true,
+      useNativeDriver: false,
     }).start();
 
     const interval = setInterval(() => {
@@ -81,7 +81,10 @@ export default function ActivationScreen() {
   const handleVerify = async () => {
     const fullCode = code.join("");
     if (fullCode.length < 4) {
-      showToast({ message: "Please enter the 4-digit activation code sent to you.", type: "error" });
+      showToast({
+        message: "Please enter the 4-digit activation code sent to you.",
+        type: "error",
+      });
       return;
     }
 
@@ -90,10 +93,19 @@ export default function ActivationScreen() {
       // TODO: Replace with real OTP verification API call using the generated AuthApi
       await new Promise<void>((resolve) => setTimeout(resolve, 1500));
       router.replace("/(main)");
-      showToast({ message: "Account activated successfully!", type: "success" });
+      showToast({
+        message: "Account activated successfully!",
+        type: "success",
+      });
     } catch (error) {
       setIsLoading(false);
-      showToast({ message: getRequestErrorMessage(error, "The code you entered is invalid or has expired."), type: "error" });
+      showToast({
+        message: getRequestErrorMessage(
+          error,
+          "The code you entered is invalid or has expired.",
+        ),
+        type: "error",
+      });
     }
   };
 
@@ -109,16 +121,26 @@ export default function ActivationScreen() {
             </Pressable>
           </View>
 
-          <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-            <Animated.View style={[styles.illustrationContainer, { opacity: fadeAnim }]}>
+          <ScrollView
+            contentContainerStyle={styles.content}
+            keyboardShouldPersistTaps="handled"
+          >
+            <Animated.View
+              style={[styles.illustrationContainer, { opacity: fadeAnim }]}
+            >
               <View style={styles.iconBackground}>
-                <MaterialCommunityIcons name="shield-check" size={48} color="#135BEC" />
+                <MaterialCommunityIcons
+                  name="shield-check"
+                  size={48}
+                  color="#135BEC"
+                />
               </View>
             </Animated.View>
 
             <Text style={styles.title}>Account Activation</Text>
             <Text style={styles.subtitle}>
-              We've sent a 4-digit activation code to your registered device. Please enter it below.
+              We've sent a 4-digit activation code to your registered device.
+              Please enter it below.
             </Text>
 
             <View style={styles.codeContainer}>
@@ -126,7 +148,10 @@ export default function ActivationScreen() {
                 <TextInput
                   key={index}
                   ref={inputRefs[index]}
-                  style={[styles.codeInput, digit !== "" && styles.codeInputFilled]}
+                  style={[
+                    styles.codeInput,
+                    digit !== "" && styles.codeInputFilled,
+                  ]}
                   value={digit}
                   onChangeText={(text) => handleCodeChange(text, index)}
                   onKeyPress={(e) => handleKeyPress(e, index)}

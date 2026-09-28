@@ -1,11 +1,17 @@
-import React, { createContext, useContext, useState, useCallback, useRef } from "react";
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  Animated, 
-  Dimensions, 
-  Pressable 
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useCallback,
+  useRef,
+} from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  Animated,
+  Dimensions,
+  Pressable,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { COLORS } from "../constants/colors";
@@ -24,7 +30,9 @@ interface ToastContextType {
 
 const ToastContext = createContext<ToastContextType | undefined>(undefined);
 
-export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => {
   const [toast, setToast] = useState<ToastOptions | null>(null);
   const opacity = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(-100)).current;
@@ -35,52 +43,61 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       Animated.timing(opacity, {
         toValue: 0,
         duration: 300,
-        useNativeDriver: true,
+        useNativeDriver: false,
       }),
       Animated.timing(translateY, {
         toValue: -100,
         duration: 300,
-        useNativeDriver: true,
+        useNativeDriver: false,
       }),
     ]).start(() => setToast(null));
   }, [opacity, translateY]);
 
-  const showToast = useCallback(({ message, type = "info", duration = 3000 }: ToastOptions) => {
-    if (timerRef.current) clearTimeout(timerRef.current);
-    
-    setToast({ message, type, duration });
-    
-    Animated.parallel([
-      Animated.timing(opacity, {
-        toValue: 1,
-        duration: 400,
-        useNativeDriver: true,
-      }),
-      Animated.timing(translateY, {
-        toValue: 50,
-        duration: 400,
-        useNativeDriver: true,
-      }),
-    ]).start();
+  const showToast = useCallback(
+    ({ message, type = "info", duration = 3000 }: ToastOptions) => {
+      if (timerRef.current) clearTimeout(timerRef.current);
 
-    timerRef.current = setTimeout(() => {
-      hideToast();
-    }, duration);
-  }, [hideToast, opacity, translateY]);
+      setToast({ message, type, duration });
+
+      Animated.parallel([
+        Animated.timing(opacity, {
+          toValue: 1,
+          duration: 400,
+          useNativeDriver: false,
+        }),
+        Animated.timing(translateY, {
+          toValue: 50,
+          duration: 400,
+          useNativeDriver: false,
+        }),
+      ]).start();
+
+      timerRef.current = setTimeout(() => {
+        hideToast();
+      }, duration);
+    },
+    [hideToast, opacity, translateY],
+  );
 
   const getIcon = (type: ToastType) => {
     switch (type) {
-      case "success": return "checkmark-circle";
-      case "error": return "alert-circle";
-      default: return "information-circle";
+      case "success":
+        return "checkmark-circle";
+      case "error":
+        return "alert-circle";
+      default:
+        return "information-circle";
     }
   };
 
   const getColor = (type: ToastType) => {
     switch (type) {
-      case "success": return COLORS.statusCompleted;
-      case "error": return "#EF4444";
-      default: return COLORS.primary;
+      case "success":
+        return COLORS.statusCompleted;
+      case "error":
+        return "#EF4444";
+      default:
+        return COLORS.primary;
     }
   };
 
@@ -88,17 +105,22 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     <ToastContext.Provider value={{ showToast }}>
       {children}
       {toast && (
-        <Animated.View 
+        <Animated.View
           style={[
-            styles.toastContainer, 
-            { opacity, transform: [{ translateY }] }
+            styles.toastContainer,
+            { opacity, transform: [{ translateY }] },
           ]}
         >
-          <View style={[styles.toast, { borderLeftColor: getColor(toast.type || "info") }]}>
-            <Ionicons 
-              name={getIcon(toast.type || "info") as any} 
-              size={24} 
-              color={getColor(toast.type || "info")} 
+          <View
+            style={[
+              styles.toast,
+              { borderLeftColor: getColor(toast.type || "info") },
+            ]}
+          >
+            <Ionicons
+              name={getIcon(toast.type || "info") as any}
+              size={24}
+              color={getColor(toast.type || "info")}
               style={styles.toastIcon}
             />
             <Text style={styles.message}>{toast.message}</Text>

@@ -1,5 +1,14 @@
 import React, { useEffect } from "react";
-import { View, Text, StyleSheet, ScrollView, Pressable, ActivityIndicator, RefreshControl, useWindowDimensions } from "react-native";
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  Pressable,
+  ActivityIndicator,
+  RefreshControl,
+  useWindowDimensions,
+} from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import { StatusBar } from "expo-status-bar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -9,23 +18,41 @@ import { COLORS } from "../../../src/constants/colors";
 import { LessonsApi } from "../../../src/api/generated/endpoints/lessons-api";
 import { Configuration } from "../../../src/api/generated/configuration";
 import api, { API_BASE_URL, STORAGE_KEYS } from "../../../src/services/api";
-import * as SecureStore from 'expo-secure-store';
+import { StorageService } from "../../../src/services/storage";
 import { useToast } from "../../../src/context/ToastContext";
 import { LessonDetailDto } from "../../../src/api/generated/models/lesson-detail-dto";
-import { LessonBlockDto, LessonBlockDtoBlockTypeEnum } from "../../../src/api/generated/models/lesson-block-dto";
-import { getApiErrorMessage, getRequestErrorMessage } from "../../../src/utils/apiError";
+import {
+  LessonBlockDto,
+  LessonBlockDtoBlockTypeEnum,
+} from "../../../src/api/generated/models/lesson-block-dto";
+import {
+  getApiErrorMessage,
+  getRequestErrorMessage,
+} from "../../../src/utils/apiError";
 
-type LessonTablePayload = { type?: string; originalType?: string; columns?: unknown[]; rows?: unknown[][] };
+type LessonTablePayload = {
+  type?: string;
+  originalType?: string;
+  columns?: unknown[];
+  rows?: unknown[][];
+};
 
 const normalizePayload = (payload: unknown): Record<string, any> => {
   if (typeof payload === "string") {
-    try { return JSON.parse(payload); } catch { return { content: payload }; }
+    try {
+      return JSON.parse(payload);
+    } catch {
+      return { content: payload };
+    }
   }
-  return payload && typeof payload === "object" ? payload as Record<string, any> : {};
+  return payload && typeof payload === "object"
+    ? (payload as Record<string, any>)
+    : {};
 };
 
 const cellText = (value: unknown) => {
-  if (value && typeof value === "object" && "content" in value) return String((value as { content?: unknown }).content ?? "");
+  if (value && typeof value === "object" && "content" in value)
+    return String((value as { content?: unknown }).content ?? "");
   return value == null ? "" : String(value);
 };
 
@@ -34,13 +61,18 @@ const isTablePayload = (payload: LessonTablePayload) =>
 
 const isOrderedList = (payload: Record<string, any>) => {
   const style = String(payload.listStyle ?? payload.type ?? "").toLowerCase();
-  return payload.ordered === true || ["ordered", "numbered", "orderedlist"].includes(style);
+  return (
+    payload.ordered === true ||
+    ["ordered", "numbered", "orderedlist"].includes(style)
+  );
 };
 
 const listItemText = (item: unknown) => cellText(item);
 
 const containsObjectiveMarker = (value: unknown) =>
-  String(value ?? "").toLowerCase().includes("objective");
+  String(value ?? "")
+    .toLowerCase()
+    .includes("objective");
 
 const isObjectivesList = (
   blocks: LessonBlockDto[],
@@ -49,9 +81,15 @@ const isObjectivesList = (
   items: unknown[],
 ) => {
   // Newer editor payloads can identify objectives directly.
-  if (payload.isObjective === true || payload.isObjectives === true) return true;
+  if (payload.isObjective === true || payload.isObjectives === true)
+    return true;
 
-  const payloadLabels = [payload.title, payload.heading, payload.section, payload.label];
+  const payloadLabels = [
+    payload.title,
+    payload.heading,
+    payload.section,
+    payload.label,
+  ];
   if (payloadLabels.some(containsObjectiveMarker)) return true;
 
   // The portal generally writes an Objectives heading or introductory paragraph
@@ -60,47 +98,67 @@ const isObjectivesList = (
   const nearbyBlocks = blocks.slice(Math.max(0, index - 2), index);
   const hasObjectiveContext = nearbyBlocks.some((nearbyBlock) => {
     const nearbyPayload = normalizePayload(nearbyBlock.payload);
-    return containsObjectiveMarker(nearbyPayload.content)
-      || String(nearbyPayload.content ?? "").toLowerCase().includes("by the end of this lesson");
+    return (
+      containsObjectiveMarker(nearbyPayload.content) ||
+      String(nearbyPayload.content ?? "")
+        .toLowerCase()
+        .includes("by the end of this lesson")
+    );
   });
 
-  return hasObjectiveContext || items.some((item) =>
-    listItemText(item).toLowerCase().includes("students should be able to"),
+  return (
+    hasObjectiveContext ||
+    items.some((item) =>
+      listItemText(item).toLowerCase().includes("students should be able to"),
+    )
   );
 };
 
 // ─── API Client ──────────────────────────────────────────────────────────────
 const lessonsApi = new LessonsApi(
-  new Configuration({ 
+  new Configuration({
     basePath: API_BASE_URL,
-    accessToken: async () => (await SecureStore.getItemAsync(STORAGE_KEYS.ACCESS_TOKEN)) || ""
+    accessToken: async () =>
+      (await StorageService.getItem(STORAGE_KEYS.ACCESS_TOKEN)) || "",
   }),
   API_BASE_URL,
-  api
+  api,
 );
 
 export default function TopicContentScreen() {
   const insets = useSafeAreaInsets();
   const { width: screenWidth } = useWindowDimensions();
   const router = useRouter();
-  const { topicId, topicTitle } = useLocalSearchParams<{ 
-    topicId: string; 
+  const { topicId, topicTitle } = useLocalSearchParams<{
+    topicId: string;
     topicTitle: string;
   }>();
 
   const { showToast } = useToast();
 
-  const { data: lessonDetail = null, isPending: isLoading, isError, error: queryError, refetch, isRefetching } = useQuery({
+  const {
+    data: lessonDetail = null,
+    isPending: isLoading,
+    isError,
+    error: queryError,
+    refetch,
+    isRefetching,
+  } = useQuery({
     queryKey: ["topicContent", topicId],
     queryFn: async () => {
       if (!topicId) throw new Error("Missing topic ID");
-      
+
       const response = await lessonsApi.getLesson({ lessonUnitId: topicId });
-      
-      console.log("[TopicContent] API Response:", JSON.stringify(response.data, null, 2));
+
+      console.log(
+        "[TopicContent] API Response:",
+        JSON.stringify(response.data, null, 2),
+      );
 
       if (!response.data.success) {
-        throw new Error(getApiErrorMessage(response.data, "Failed to load lesson content."));
+        throw new Error(
+          getApiErrorMessage(response.data, "Failed to load lesson content."),
+        );
       }
 
       return response.data.data || null;
@@ -108,11 +166,13 @@ export default function TopicContentScreen() {
     enabled: !!topicId,
   });
 
-  const error = isError ? getRequestErrorMessage(queryError, "An error occurred.") : null;
+  const error = isError
+    ? getRequestErrorMessage(queryError, "An error occurred.")
+    : null;
 
   useEffect(() => {
     if (error) {
-       showToast({ message: error, type: "error" });
+      showToast({ message: error, type: "error" });
     }
   }, [error, showToast]);
 
@@ -120,7 +180,11 @@ export default function TopicContentScreen() {
     refetch();
   };
 
-  const renderBlock = (block: LessonBlockDto, index: number, blocks: LessonBlockDto[]) => {
+  const renderBlock = (
+    block: LessonBlockDto,
+    index: number,
+    blocks: LessonBlockDto[],
+  ) => {
     const payload = normalizePayload(block.payload);
     if (!block.payload) return null;
 
@@ -128,22 +192,46 @@ export default function TopicContentScreen() {
     // the block enum, so mobile supports both current and newer API schemas.
     if (isTablePayload(payload)) {
       const columns = Array.isArray(payload.columns) ? payload.columns : [];
-      const rows = Array.isArray(payload.rows) ? payload.rows.filter(Array.isArray) : [];
+      const rows = Array.isArray(payload.rows)
+        ? payload.rows.filter(Array.isArray)
+        : [];
       if (columns.length === 0 || rows.length === 0) return null;
       const availableWidth = screenWidth - 40;
-      const columnWidth = Math.max(96, Math.floor(availableWidth / Math.min(columns.length, 3)));
+      const columnWidth = Math.max(
+        96,
+        Math.floor(availableWidth / Math.min(columns.length, 3)),
+      );
       const tableWidth = Math.max(availableWidth, columnWidth * columns.length);
 
       return (
         <View key={block.id || index} style={styles.tableShell}>
-          <ScrollView horizontal showsHorizontalScrollIndicator nestedScrollEnabled contentContainerStyle={styles.tableScrollContent}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator
+            nestedScrollEnabled
+            contentContainerStyle={styles.tableScrollContent}
+          >
             <View style={[styles.lessonTable, { width: tableWidth }]}>
               <View style={styles.tableHeaderRow}>
-                {columns.map((column, columnIndex) => <Text key={columnIndex} style={[styles.tableHeaderCell, { width: columnWidth }]}>{cellText(column)}</Text>)}
+                {columns.map((column, columnIndex) => (
+                  <Text
+                    key={columnIndex}
+                    style={[styles.tableHeaderCell, { width: columnWidth }]}
+                  >
+                    {cellText(column)}
+                  </Text>
+                ))}
               </View>
               {rows.map((row, rowIndex) => (
                 <View key={rowIndex} style={styles.tableRow}>
-                  {columns.map((_, columnIndex) => <Text key={columnIndex} style={[styles.tableCell, { width: columnWidth }]}>{cellText(row[columnIndex])}</Text>)}
+                  {columns.map((_, columnIndex) => (
+                    <Text
+                      key={columnIndex}
+                      style={[styles.tableCell, { width: columnWidth }]}
+                    >
+                      {cellText(row[columnIndex])}
+                    </Text>
+                  ))}
                 </View>
               ))}
             </View>
@@ -159,7 +247,16 @@ export default function TopicContentScreen() {
       return (
         <View key={block.id || index} style={styles.listItem}>
           <View style={styles.listDotContainer}>
-            {ordered ? <Text style={styles.listOrderNumber}>{index + 1}.</Text> : <Ionicons name="ellipse" size={8} color={COLORS.primary} style={{ marginTop: 7 }} />}
+            {ordered ? (
+              <Text style={styles.listOrderNumber}>{index + 1}.</Text>
+            ) : (
+              <Ionicons
+                name="ellipse"
+                size={8}
+                color={COLORS.primary}
+                style={{ marginTop: 7 }}
+              />
+            )}
           </View>
           <Text style={styles.listItemText}>{payload.content ?? ""}</Text>
         </View>
@@ -168,60 +265,130 @@ export default function TopicContentScreen() {
 
     switch (block.blockType) {
       case LessonBlockDtoBlockTypeEnum.Heading:
-        // Use H1 style for the very first heading if it matches the main topic, 
+        // Use H1 style for the very first heading if it matches the main topic,
         // otherwise regular section heading
         const isMainHeading = index === 0;
         return (
           <View key={block.id || index} style={styles.headingBlock}>
             {!isMainHeading && <View style={styles.sectionAccent} />}
-            <Text style={isMainHeading ? styles.heroTitle : styles.sectionTitle}>
+            <Text
+              style={isMainHeading ? styles.heroTitle : styles.sectionTitle}
+            >
               {payload.content}
             </Text>
           </View>
         );
 
       case LessonBlockDtoBlockTypeEnum.Paragraph:
-        const isObjectivesIntro = containsObjectiveMarker(payload.content)
-          || String(payload.content ?? "").toLowerCase().includes("by the end of this lesson");
-        
+        const isObjectivesIntro =
+          containsObjectiveMarker(payload.content) ||
+          String(payload.content ?? "")
+            .toLowerCase()
+            .includes("by the end of this lesson");
+
         return (
-          <View key={block.id || index} style={isObjectivesIntro ? styles.objectivesIntroContainer : styles.paragraphBlock}>
-             <Text style={isObjectivesIntro ? styles.objectivesIntroText : styles.bodyText}>
-               {payload.content}
-             </Text>
+          <View
+            key={block.id || index}
+            style={
+              isObjectivesIntro
+                ? styles.objectivesIntroContainer
+                : styles.paragraphBlock
+            }
+          >
+            <Text
+              style={
+                isObjectivesIntro ? styles.objectivesIntroText : styles.bodyText
+              }
+            >
+              {payload.content}
+            </Text>
           </View>
         );
 
       case LessonBlockDtoBlockTypeEnum.List:
         const items = Array.isArray(payload.items) ? payload.items : [];
         const ordered = isOrderedList(payload);
-        const shouldHighlightObjectives = isObjectivesList(blocks, index, payload, items);
+        const shouldHighlightObjectives = isObjectivesList(
+          blocks,
+          index,
+          payload,
+          items,
+        );
 
         return (
-          <View key={block.id || index} style={shouldHighlightObjectives ? styles.objectivesCard : styles.listBlock}>
+          <View
+            key={block.id || index}
+            style={
+              shouldHighlightObjectives
+                ? styles.objectivesCard
+                : styles.listBlock
+            }
+          >
             {shouldHighlightObjectives && (
-               <View style={styles.objectivesHeader}>
-                 <MaterialCommunityIcons name="target" size={20} color={COLORS.primary} />
-                 <Text style={styles.objectivesTitle}>Learning Objectives</Text>
-               </View>
+              <View style={styles.objectivesHeader}>
+                <MaterialCommunityIcons
+                  name="target"
+                  size={20}
+                  color={COLORS.primary}
+                />
+                <Text style={styles.objectivesTitle}>Learning Objectives</Text>
+              </View>
             )}
-            
+
             {items.map((item: unknown, i: number) => (
               <View key={i} style={styles.listItem}>
                 <View style={styles.listDotContainer}>
                   {ordered ? (
                     <Text style={styles.listOrderNumber}>{i + 1}.</Text>
                   ) : (
-                    <Ionicons name="ellipse" size={8} color={COLORS.primary} style={{ marginTop: 7 }} />
+                    <Ionicons
+                      name="ellipse"
+                      size={8}
+                      color={COLORS.primary}
+                      style={{ marginTop: 7 }}
+                    />
                   )}
                 </View>
                 <View style={styles.listItemContent}>
                   <Text style={styles.listItemText}>{listItemText(item)}</Text>
-                  {item && typeof item === "object" && Array.isArray((item as any).children) && (item as any).children.map((child: any, childIndex: number) => {
-                    const childItems = Array.isArray(child?.items) ? child.items : [];
-                    const childOrdered = isOrderedList(child ?? {});
-                    return <View key={childIndex} style={styles.nestedList}>{childItems.map((childItem: unknown, nestedIndex: number) => <View key={nestedIndex} style={styles.listItem}><View style={styles.listDotContainer}>{childOrdered ? <Text style={styles.listOrderNumber}>{nestedIndex + 1}.</Text> : <Ionicons name="ellipse" size={6} color="#64748B" style={{ marginTop: 8 }} />}</View><Text style={styles.listItemText}>{listItemText(childItem)}</Text></View>)}</View>;
-                  })}
+                  {item &&
+                    typeof item === "object" &&
+                    Array.isArray((item as any).children) &&
+                    (item as any).children.map(
+                      (child: any, childIndex: number) => {
+                        const childItems = Array.isArray(child?.items)
+                          ? child.items
+                          : [];
+                        const childOrdered = isOrderedList(child ?? {});
+                        return (
+                          <View key={childIndex} style={styles.nestedList}>
+                            {childItems.map(
+                              (childItem: unknown, nestedIndex: number) => (
+                                <View key={nestedIndex} style={styles.listItem}>
+                                  <View style={styles.listDotContainer}>
+                                    {childOrdered ? (
+                                      <Text style={styles.listOrderNumber}>
+                                        {nestedIndex + 1}.
+                                      </Text>
+                                    ) : (
+                                      <Ionicons
+                                        name="ellipse"
+                                        size={6}
+                                        color="#64748B"
+                                        style={{ marginTop: 8 }}
+                                      />
+                                    )}
+                                  </View>
+                                  <Text style={styles.listItemText}>
+                                    {listItemText(childItem)}
+                                  </Text>
+                                </View>
+                              ),
+                            )}
+                          </View>
+                        );
+                      },
+                    )}
                 </View>
               </View>
             ))}
@@ -245,7 +412,7 @@ export default function TopicContentScreen() {
   return (
     <View style={styles.container}>
       <StatusBar style="dark" />
-      
+
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
         <Pressable onPress={() => router.back()} style={styles.backButton}>
@@ -257,11 +424,18 @@ export default function TopicContentScreen() {
         <View style={{ width: 40 }} />
       </View>
 
-      <ScrollView 
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 40 }]}
+      <ScrollView
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingBottom: insets.bottom + 40 },
+        ]}
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl refreshing={isRefetching} onRefresh={onRefresh} tintColor={COLORS.primary} />
+          <RefreshControl
+            refreshing={isRefetching}
+            onRefresh={onRefresh}
+            tintColor={COLORS.primary}
+          />
         }
       >
         {error ? (

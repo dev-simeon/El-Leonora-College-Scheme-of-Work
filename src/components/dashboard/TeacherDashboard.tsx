@@ -24,7 +24,7 @@ import { UpcomingActivitiesCard } from "./UpcomingActivitiesCard";
 const accountApi = new AccountApi(
   new Configuration({ basePath: API_BASE_URL }),
   API_BASE_URL,
-  api
+  api,
 );
 
 // Stitch Design Tokens
@@ -50,22 +50,25 @@ export default function TeacherDashboard() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user } = useAuth();
-  
+
   // Fetch actual profile data (cached by React Query)
   const { data: profileData = null } = useQuery({
     queryKey: ["profile", user?.id || "anonymous"],
     queryFn: async () => {
       const response = await accountApi.getMyProfile();
       if (!response.data.success || !response.data.data) {
-        throw new Error(getApiErrorMessage(response.data, "Failed to load profile"));
+        throw new Error(
+          getApiErrorMessage(response.data, "Failed to load profile"),
+        );
       }
       return response.data.data;
     },
     enabled: !!user,
   });
 
-  const firstName = profileData?.firstName || user?.name?.split(' ')[0] || "Teacher";
-  
+  const firstName =
+    profileData?.firstName || user?.name?.split(" ")[0] || "Teacher";
+
   const [isScheduleModalVisible, setScheduleModalVisible] = useState(false);
 
   const handleNavigateToSubjects = () => {
@@ -75,36 +78,39 @@ export default function TeacherDashboard() {
   return (
     <View style={styles.container}>
       <StatusBar style="dark" />
-      
+
       {/* Top Header */}
-      <View
-        style={[
-          styles.header,
-          { paddingTop: Math.max(insets.top, 20) }
-        ]}
-      >
+      <View style={[styles.header, { paddingTop: Math.max(insets.top, 20) }]}>
         <View style={styles.headerLeft}>
           <Image
-            source={{ uri: "https://api.dicebear.com/7.x/avataaars/png?seed=" + firstName }}
+            source={{
+              uri:
+                "https://api.dicebear.com/7.x/avataaars/png?seed=" + firstName,
+            }}
             style={styles.avatar}
           />
         </View>
         <Pressable style={styles.notificationBtn}>
-          <Ionicons name="notifications-outline" size={24} color={STITCH_COLORS.primary} />
+          <Ionicons
+            name="notifications-outline"
+            size={24}
+            color={STITCH_COLORS.primary}
+          />
           <View style={styles.notificationBadge} />
         </Pressable>
       </View>
 
       <ScrollView
         style={styles.scrollView}
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 80 }]}
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingBottom: insets.bottom + 80 },
+        ]}
         showsVerticalScrollIndicator={false}
       >
         {/* Main Greeting Section */}
         <View style={styles.mainGreeting}>
-          <Text style={styles.greetingTitle}>
-            Good Morning, {firstName}
-          </Text>
+          <Text style={styles.greetingTitle}>Good Morning, {firstName}</Text>
           <Text style={styles.greetingSubtitle}>
             {user?.currentTerm || "Current Term"} • 2 Classes Today
           </Text>
@@ -118,13 +124,19 @@ export default function TeacherDashboard() {
               <Text style={styles.cardSubtitle}>Current Session Summary</Text>
             </View>
             <View style={styles.iconContainerPrimary}>
-              <Ionicons name="people-outline" size={20} color={STITCH_COLORS.primary} />
+              <Ionicons
+                name="people-outline"
+                size={20}
+                color={STITCH_COLORS.primary}
+              />
             </View>
           </View>
 
           <View style={styles.heroMiddle}>
             <View style={styles.attendanceStats}>
-              <Text style={styles.attendanceValue}>18<Text style={styles.attendanceTotal}>/30</Text></Text>
+              <Text style={styles.attendanceValue}>
+                18<Text style={styles.attendanceTotal}>/30</Text>
+              </Text>
               <Text style={styles.attendanceLabel}>Present</Text>
             </View>
             <View style={styles.attendanceStatsRight}>
@@ -134,7 +146,11 @@ export default function TeacherDashboard() {
           </View>
 
           <Pressable style={styles.markAttendanceBtn}>
-            <Ionicons name="checkmark-done" size={20} color={STITCH_COLORS.onPrimaryContainer} />
+            <Ionicons
+              name="checkmark-done"
+              size={20}
+              color={STITCH_COLORS.onPrimaryContainer}
+            />
             <Text style={styles.markAttendanceText}>Mark Attendance</Text>
           </Pressable>
         </View>
@@ -145,31 +161,43 @@ export default function TeacherDashboard() {
             <View>
               <Text style={styles.cardTitle}>Today's Schedule</Text>
             </View>
-            <Pressable onPress={() => setScheduleModalVisible(true)} style={styles.viewAllBtn}>
+            <Pressable
+              onPress={() => setScheduleModalVisible(true)}
+              style={styles.viewAllBtn}
+            >
               <Text style={styles.linkText}>View All</Text>
             </Pressable>
           </View>
 
-          <Pressable style={styles.ongoingClassCard} onPress={() => setScheduleModalVisible(true)}>
+          <Pressable
+            style={styles.ongoingClassCard}
+            onPress={() => setScheduleModalVisible(true)}
+          >
             <View style={styles.ongoingHeader}>
               <View style={styles.ongoingLeft}>
                 <View style={styles.ongoingIcon}>
-                  <Ionicons name="calculator" size={24} color={STITCH_COLORS.onPrimaryContainer} />
+                  <Ionicons
+                    name="calculator"
+                    size={24}
+                    color={STITCH_COLORS.onPrimaryContainer}
+                  />
                 </View>
                 <View style={{ flexShrink: 1 }}>
                   <View style={styles.statusBadge}>
                     <Text style={styles.statusBadgeText}>IN PROGRESS</Text>
                   </View>
                   <Text style={styles.ongoingTitle}>Advanced Economics</Text>
-                  <Text style={styles.ongoingSubtitle}>Room 4B • 09:00 - 10:30</Text>
+                  <Text style={styles.ongoingSubtitle}>
+                    Room 4B • 09:00 - 10:30
+                  </Text>
                 </View>
               </View>
             </View>
 
             <View style={styles.progressBarBg}>
-              <View style={[styles.progressBarFill, { width: '65%' }]} />
+              <View style={[styles.progressBarFill, { width: "65%" }]} />
             </View>
-            
+
             <View style={styles.progressTextRow}>
               <Text style={styles.progressTimeText}>Syllabus Progress</Text>
               <Text style={styles.progressTimeText}>65%</Text>
@@ -182,31 +210,54 @@ export default function TeacherDashboard() {
         {/* 3. Quick Actions */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Quick Actions</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.quickActionsContainer}>
-            <Pressable style={styles.actionItem} onPress={handleNavigateToSubjects}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.quickActionsContainer}
+          >
+            <Pressable
+              style={styles.actionItem}
+              onPress={handleNavigateToSubjects}
+            >
               <View style={styles.actionIconContainer}>
-                <Ionicons name="library-outline" size={24} color={STITCH_COLORS.primary} />
+                <Ionicons
+                  name="library-outline"
+                  size={24}
+                  color={STITCH_COLORS.primary}
+                />
               </View>
               <Text style={styles.actionText}>Subjects</Text>
             </Pressable>
 
             <Pressable style={styles.actionItem}>
               <View style={styles.actionIconContainer}>
-                <Ionicons name="people-outline" size={24} color={STITCH_COLORS.primary} />
+                <Ionicons
+                  name="people-outline"
+                  size={24}
+                  color={STITCH_COLORS.primary}
+                />
               </View>
               <Text style={styles.actionText}>Attendance</Text>
             </Pressable>
 
             <Pressable style={styles.actionItem}>
               <View style={styles.actionIconContainer}>
-                <Ionicons name="document-text-outline" size={24} color={STITCH_COLORS.primary} />
+                <Ionicons
+                  name="document-text-outline"
+                  size={24}
+                  color={STITCH_COLORS.primary}
+                />
               </View>
               <Text style={styles.actionText}>Assignments</Text>
             </Pressable>
 
             <Pressable style={styles.actionItem}>
               <View style={styles.actionIconContainer}>
-                <Ionicons name="create-outline" size={24} color={STITCH_COLORS.primary} />
+                <Ionicons
+                  name="create-outline"
+                  size={24}
+                  color={STITCH_COLORS.primary}
+                />
               </View>
               <Text style={styles.actionText}>Notes</Text>
             </Pressable>
@@ -226,11 +277,13 @@ export default function TeacherDashboard() {
 
           <View style={styles.pendingItem}>
             <View style={styles.pendingItemTop}>
-              <Text style={styles.pendingItemTitle}>English Literature Essay</Text>
+              <Text style={styles.pendingItemTitle}>
+                English Literature Essay
+              </Text>
               <Text style={styles.pendingItemMeta}>85% Submitted</Text>
             </View>
             <View style={styles.progressBarBg}>
-              <View style={[styles.progressBarFill, { width: '85%' }]} />
+              <View style={[styles.progressBarFill, { width: "85%" }]} />
             </View>
             <Pressable style={styles.gradeBtn}>
               <Text style={styles.gradeBtnText}>Grade Submissions</Text>
@@ -247,20 +300,40 @@ export default function TeacherDashboard() {
         onRequestClose={() => setScheduleModalVisible(false)}
       >
         <View style={styles.modalOverlay}>
-          <Pressable style={styles.modalBackdrop} onPress={() => setScheduleModalVisible(false)} />
-          <View style={[styles.modalContent, { paddingBottom: Math.max(insets.bottom, 24) }]}>
+          <Pressable
+            style={styles.modalBackdrop}
+            onPress={() => setScheduleModalVisible(false)}
+            hitSlop={12}
+          />
+          <View
+            style={[
+              styles.modalContent,
+              { paddingBottom: Math.max(insets.bottom, 24) },
+            ]}
+          >
             <View style={styles.modalDragIndicator} />
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Remaining Classes</Text>
-              <Pressable onPress={() => setScheduleModalVisible(false)} style={styles.modalCloseBtn}>
-                <Ionicons name="close" size={24} color={STITCH_COLORS.onSurfaceVariant} />
+              <Pressable
+                onPress={() => setScheduleModalVisible(false)}
+                style={styles.modalCloseBtn}
+              >
+                <Ionicons
+                  name="close"
+                  size={24}
+                  color={STITCH_COLORS.onSurfaceVariant}
+                />
               </Pressable>
             </View>
 
             <View style={styles.modalBody}>
               <View style={styles.remainingClassItem}>
                 <View style={styles.remainingClassIcon}>
-                  <Ionicons name="flask-outline" size={24} color={STITCH_COLORS.onSurface} />
+                  <Ionicons
+                    name="flask-outline"
+                    size={24}
+                    color={STITCH_COLORS.onSurface}
+                  />
                 </View>
                 <View style={styles.remainingClassInfo}>
                   <Text style={styles.remainingClassTime}>10:45 - 11:45</Text>
@@ -623,12 +696,14 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
+    backgroundColor: "rgba(0, 0, 0, 0.36)",
   },
   modalContent: {
     backgroundColor: STITCH_COLORS.surfaceContainerLowest,
     borderTopLeftRadius: 32,
     borderTopRightRadius: 32,
     padding: 24,
+    zIndex: 1,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: -8 },
     shadowOpacity: 0.15,
@@ -656,9 +731,13 @@ const styles = StyleSheet.create({
     color: STITCH_COLORS.onSurface,
   },
   modalCloseBtn: {
+    minWidth: 40,
+    minHeight: 40,
     padding: 8,
     backgroundColor: STITCH_COLORS.surfaceContainerLow,
     borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
   },
   modalBody: {
     gap: 16,

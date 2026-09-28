@@ -11,7 +11,10 @@ import {
   Alert,
   ActivityIndicator,
 } from "react-native";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -27,7 +30,7 @@ import { getApiErrorMessage, getRequestErrorMessage } from "../utils/apiError";
 const accountApi = new AccountApi(
   new Configuration({ basePath: API_BASE_URL }),
   API_BASE_URL,
-  api
+  api,
 );
 
 // ─── Props ────────────────────────────────────────────────────────────────────
@@ -46,6 +49,9 @@ function PasswordField({
   show,
   onToggleShow,
   placeholder,
+  isFocused,
+  onFocus,
+  onBlur,
 }: {
   label: string;
   value: string;
@@ -53,25 +59,43 @@ function PasswordField({
   show: boolean;
   onToggleShow: () => void;
   placeholder?: string;
+  isFocused?: boolean;
+  onFocus?: () => void;
+  onBlur?: () => void;
 }) {
   return (
     <View style={styles.formGroup}>
       <Text style={styles.label}>{label}</Text>
-      <View style={styles.inputContainer}>
+      <View
+        style={[
+          styles.inputContainer,
+          isFocused && styles.inputContainerFocused,
+        ]}
+      >
         <View style={styles.inputIconLeft}>
           <Ionicons name="lock-closed-outline" size={20} color="#9CA3AF" />
         </View>
         <TextInput
-          style={styles.input}
+          style={[
+            styles.input,
+            Platform.OS === "web" && ({ outline: "none" } as any),
+          ]}
           placeholder={placeholder ?? "••••••••"}
           placeholderTextColor="#9CA3AF"
           secureTextEntry={!show}
           value={value}
           onChangeText={onChangeText}
+          onFocus={onFocus}
+          onBlur={onBlur}
           autoCapitalize="none"
           autoCorrect={false}
+          selectionColor="#135BEC"
         />
-        <Pressable style={styles.inputIconRight} onPress={onToggleShow}>
+        <Pressable
+          style={styles.inputIconRight}
+          onPress={onToggleShow}
+          hitSlop={8}
+        >
           <Ionicons
             name={show ? "eye-outline" : "eye-off-outline"}
             size={20}
@@ -84,11 +108,15 @@ function PasswordField({
 }
 
 // ─── Strength helper ──────────────────────────────────────────────────────────
-const getStrength = (p: string): { label: string; color: string; pct: number } => {
+const getStrength = (
+  p: string,
+): { label: string; color: string; pct: number } => {
   if (!p) return { label: "", color: "#E5E7EB", pct: 0 };
   if (p.length < 8) return { label: "Too short", color: "#EF4444", pct: 25 };
   if (p.length < 8) return { label: "Weak", color: "#F97316", pct: 50 };
-  const score = [/[A-Z]/, /[0-9]/, /[^A-Za-z0-9]/].filter((r) => r.test(p)).length;
+  const score = [/[A-Z]/, /[0-9]/, /[^A-Za-z0-9]/].filter((r) =>
+    r.test(p),
+  ).length;
   if (score >= 2) return { label: "Strong", color: "#22C55E", pct: 100 };
   return { label: "Medium", color: "#EAB308", pct: 75 };
 };
@@ -110,6 +138,9 @@ export default function ChangePasswordForm({
   const [showCurrent, setShowCurrent] = useState(false);
   const [showNew, setShowNew] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [focusedField, setFocusedField] = useState<
+    "current" | "new" | "confirm" | null
+  >(null);
 
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -120,9 +151,12 @@ export default function ChangePasswordForm({
   const validate = (): string | null => {
     if (!currentPassword.trim()) return "Please enter your current password.";
     if (!newPassword.trim()) return "Please enter a new password.";
-    if (newPassword.length < 8) return "New password must be at least 8 characters.";
-    if (newPassword !== confirmPassword) return "New password and confirmation do not match.";
-    if (currentPassword === newPassword) return "New password must be different from the current one.";
+    if (newPassword.length < 8)
+      return "New password must be at least 8 characters.";
+    if (newPassword !== confirmPassword)
+      return "New password and confirmation do not match.";
+    if (currentPassword === newPassword)
+      return "New password must be different from the current one.";
     return null;
   };
 
@@ -147,11 +181,16 @@ export default function ChangePasswordForm({
       });
 
       const body = response.data;
-      console.log('[changePassword] API response:', JSON.stringify(body, null, 2));
+      console.log(
+        "[changePassword] API response:",
+        JSON.stringify(body, null, 2),
+      );
 
       // The server wraps the result in ApiResponse — treat success:false as an error
       if (body.success === false) {
-        throw new Error(getApiErrorMessage(body, "Password change failed. Please try again."));
+        throw new Error(
+          getApiErrorMessage(body, "Password change failed. Please try again."),
+        );
       }
 
       // ── Success ─────────────────────────────────────────────────────────────
@@ -160,7 +199,7 @@ export default function ChangePasswordForm({
         : "Your password has been updated successfully.";
 
       showToast({ message: successMessage, type: "success" });
-      
+
       onSuccess?.();
       if (isForced) {
         await completeMustChangePassword();
@@ -168,12 +207,20 @@ export default function ChangePasswordForm({
         router.back();
       }
     } catch (error: any) {
-      console.log('[changePassword] ERROR caught');
-      console.log('  message         :', error.message);
-      console.log('  response body   :', JSON.stringify(error.response?.data, null, 2));
-      console.log('  full error      :', JSON.stringify(error, null, 2));
+      console.log("[changePassword] ERROR caught");
+      console.log("  message         :", error.message);
+      console.log(
+        "  response body   :",
+        JSON.stringify(error.response?.data, null, 2),
+      );
+      console.log("  full error      :", JSON.stringify(error, null, 2));
 
-      setErrorMsg(getRequestErrorMessage(error, "Failed to change password. Please try again."));
+      setErrorMsg(
+        getRequestErrorMessage(
+          error,
+          "Failed to change password. Please try again.",
+        ),
+      );
     } finally {
       setIsLoading(false);
     }
@@ -186,7 +233,7 @@ export default function ChangePasswordForm({
         <KeyboardAvoidingView
           style={styles.container}
           behavior={Platform.OS === "ios" ? "padding" : "height"}
-          keyboardVerticalOffset={0}
+          keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 24}
         >
           {/* Header */}
           <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
@@ -207,16 +254,21 @@ export default function ChangePasswordForm({
 
           <ScrollView
             style={styles.scrollView}
-            contentContainerStyle={styles.scrollContent}
+            contentContainerStyle={[
+              styles.scrollContent,
+              { paddingBottom: 40 },
+            ]}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
+            nestedScrollEnabled={Platform.OS === "android"}
           >
             {/* Forced-change banner */}
             {isForced && (
               <View style={styles.forcedBanner}>
                 <Ionicons name="shield-checkmark" size={20} color="#135BEC" />
                 <Text style={styles.forcedBannerText}>
-                  Welcome! For your security, please set a new password before continuing.
+                  Welcome! For your security, please set a new password before
+                  continuing.
                 </Text>
               </View>
             )}
@@ -225,7 +277,11 @@ export default function ChangePasswordForm({
             <View style={styles.logoSection}>
               <View style={styles.logoContainer}>
                 <View style={styles.logoBackground}>
-                  <MaterialCommunityIcons name="lock-reset" size={48} color="#135BEC" />
+                  <MaterialCommunityIcons
+                    name="lock-reset"
+                    size={48}
+                    color="#135BEC"
+                  />
                 </View>
               </View>
               <Text style={styles.logoText}>
@@ -241,7 +297,11 @@ export default function ChangePasswordForm({
             {/* Error banner */}
             {errorMsg && (
               <View style={styles.errorBanner}>
-                <Ionicons name="alert-circle-outline" size={18} color="#DC2626" />
+                <Ionicons
+                  name="alert-circle-outline"
+                  size={18}
+                  color="#DC2626"
+                />
                 <Text style={styles.errorText}>{errorMsg}</Text>
               </View>
             )}
@@ -251,18 +311,38 @@ export default function ChangePasswordForm({
               <PasswordField
                 label="Current Password"
                 value={currentPassword}
-                onChangeText={(v) => { setCurrentPassword(v); setErrorMsg(null); }}
+                onChangeText={(v) => {
+                  setCurrentPassword(v);
+                  setErrorMsg(null);
+                }}
                 show={showCurrent}
                 onToggleShow={() => setShowCurrent(!showCurrent)}
                 placeholder="Enter current password"
+                isFocused={focusedField === "current"}
+                onFocus={() => setFocusedField("current")}
+                onBlur={() =>
+                  setFocusedField((current) =>
+                    current === "current" ? null : current,
+                  )
+                }
               />
               <PasswordField
                 label="New Password"
                 value={newPassword}
-                onChangeText={(v) => { setNewPassword(v); setErrorMsg(null); }}
+                onChangeText={(v) => {
+                  setNewPassword(v);
+                  setErrorMsg(null);
+                }}
                 show={showNew}
                 onToggleShow={() => setShowNew(!showNew)}
                 placeholder="Enter new password"
+                isFocused={focusedField === "new"}
+                onFocus={() => setFocusedField("new")}
+                onBlur={() =>
+                  setFocusedField((current) =>
+                    current === "new" ? null : current,
+                  )
+                }
               />
 
               {/* Strength indicator */}
@@ -272,12 +352,17 @@ export default function ChangePasswordForm({
                     <View
                       style={[
                         styles.strengthBarFill,
-                        { width: `${strength.pct}%` as any, backgroundColor: strength.color },
+                        {
+                          width: `${strength.pct}%` as any,
+                          backgroundColor: strength.color,
+                        },
                       ]}
                     />
                   </View>
                   {strength.label ? (
-                    <Text style={[styles.strengthLabel, { color: strength.color }]}>
+                    <Text
+                      style={[styles.strengthLabel, { color: strength.color }]}
+                    >
                       {strength.label}
                     </Text>
                   ) : null}
@@ -287,27 +372,50 @@ export default function ChangePasswordForm({
               <PasswordField
                 label="Confirm New Password"
                 value={confirmPassword}
-                onChangeText={(v) => { setConfirmPassword(v); setErrorMsg(null); }}
+                onChangeText={(v) => {
+                  setConfirmPassword(v);
+                  setErrorMsg(null);
+                }}
                 show={showConfirm}
                 onToggleShow={() => setShowConfirm(!showConfirm)}
                 placeholder="Re-enter new password"
+                isFocused={focusedField === "confirm"}
+                onFocus={() => setFocusedField("confirm")}
+                onBlur={() =>
+                  setFocusedField((current) =>
+                    current === "confirm" ? null : current,
+                  )
+                }
               />
 
               {/* Match indicator */}
               {confirmPassword.length > 0 && (
                 <View style={styles.matchRow}>
                   <Ionicons
-                    name={newPassword === confirmPassword ? "checkmark-circle" : "close-circle"}
+                    name={
+                      newPassword === confirmPassword
+                        ? "checkmark-circle"
+                        : "close-circle"
+                    }
                     size={16}
-                    color={newPassword === confirmPassword ? "#22C55E" : "#EF4444"}
+                    color={
+                      newPassword === confirmPassword ? "#22C55E" : "#EF4444"
+                    }
                   />
                   <Text
                     style={[
                       styles.matchText,
-                      { color: newPassword === confirmPassword ? "#22C55E" : "#EF4444" },
+                      {
+                        color:
+                          newPassword === confirmPassword
+                            ? "#22C55E"
+                            : "#EF4444",
+                      },
                     ]}
                   >
-                    {newPassword === confirmPassword ? "Passwords match" : "Passwords do not match"}
+                    {newPassword === confirmPassword
+                      ? "Passwords match"
+                      : "Passwords do not match"}
                   </Text>
                 </View>
               )}
@@ -316,7 +424,10 @@ export default function ChangePasswordForm({
             {/* Submit */}
             <View style={styles.actionsSection}>
               <Pressable
-                style={[styles.submitButton, isLoading && styles.submitButtonDisabled]}
+                style={[
+                  styles.submitButton,
+                  isLoading && styles.submitButtonDisabled,
+                ]}
                 onPress={handleChangePassword}
                 disabled={isLoading}
               >
@@ -324,7 +435,11 @@ export default function ChangePasswordForm({
                   <ActivityIndicator size="small" color="#FFFFFF" />
                 ) : (
                   <>
-                    <Ionicons name="checkmark-circle" size={22} color="#FFFFFF" />
+                    <Ionicons
+                      name="checkmark-circle"
+                      size={22}
+                      color="#FFFFFF"
+                    />
                     <Text style={styles.submitButtonText}>
                       {isForced ? "Set Password & Continue" : "Update Password"}
                     </Text>
@@ -333,19 +448,27 @@ export default function ChangePasswordForm({
               </Pressable>
 
               {isForced && (
-                <Pressable 
-                  style={styles.logoutButton} 
+                <Pressable
+                  style={styles.logoutButton}
                   onPress={async () => {
                     try {
                       setIsLoading(true);
-                      console.log('[ChangePasswordForm] Initiation manual logout...');
+                      console.log(
+                        "[ChangePasswordForm] Initiation manual logout...",
+                      );
                       await logout();
                     } catch (err: any) {
-                      console.log('[ChangePasswordForm] Logout failed:', err.message);
+                      console.log(
+                        "[ChangePasswordForm] Logout failed:",
+                        err.message,
+                      );
                       Alert.alert(
                         "Logout Failed",
-                        getRequestErrorMessage(err, "Could not clear session. Check network or server status."),
-                        [{ text: "OK" }]
+                        getRequestErrorMessage(
+                          err,
+                          "Could not clear session. Check network or server status.",
+                        ),
+                        [{ text: "OK" }],
                       );
                     } finally {
                       setIsLoading(false);
@@ -357,8 +480,14 @@ export default function ChangePasswordForm({
                     <ActivityIndicator size="small" color="#EF4444" />
                   ) : (
                     <>
-                      <Ionicons name="log-out-outline" size={20} color="#EF4444" />
-                      <Text style={styles.logoutText}>Log Out & Clear Session</Text>
+                      <Ionicons
+                        name="log-out-outline"
+                        size={20}
+                        color="#EF4444"
+                      />
+                      <Text style={styles.logoutText}>
+                        Log Out & Clear Session
+                      </Text>
                     </>
                   )}
                 </Pressable>
@@ -469,9 +598,24 @@ const styles = StyleSheet.create({
     height: 52,
     paddingHorizontal: 4,
   },
+  inputContainerFocused: {
+    borderColor: "#135BEC",
+    backgroundColor: "#FFFFFF",
+    shadowColor: "#135BEC",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 2,
+  },
   inputIconLeft: { paddingHorizontal: 12 },
   input: { flex: 1, fontSize: 15, color: "#111827", paddingVertical: 0 },
-  inputIconRight: { paddingHorizontal: 12 },
+  inputIconRight: {
+    paddingHorizontal: 12,
+    minWidth: 40,
+    minHeight: 40,
+    justifyContent: "center",
+    alignItems: "center",
+  },
   strengthContainer: {
     flexDirection: "row",
     alignItems: "center",
@@ -487,7 +631,12 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   strengthBarFill: { height: 4, borderRadius: 9999 },
-  strengthLabel: { fontSize: 12, fontWeight: "600", minWidth: 60, textAlign: "right" },
+  strengthLabel: {
+    fontSize: 12,
+    fontWeight: "600",
+    minWidth: 60,
+    textAlign: "right",
+  },
   matchRow: {
     flexDirection: "row",
     alignItems: "center",

@@ -21,16 +21,19 @@ import { WeekData, Topic, SubjectTopics } from "../../../src/data/topicsData";
 import { LessonsApi } from "../../../src/api/generated/endpoints/lessons-api";
 import { Configuration } from "../../../src/api/generated/configuration";
 import api, { API_BASE_URL, STORAGE_KEYS } from "../../../src/services/api";
-import * as SecureStore from "expo-secure-store";
+import { StorageService } from "../../../src/services/storage";
 import { useToast } from "../../../src/context/ToastContext";
-import { getApiErrorMessage, getRequestErrorMessage } from "../../../src/utils/apiError";
+import {
+  getApiErrorMessage,
+  getRequestErrorMessage,
+} from "../../../src/utils/apiError";
 
 // ─── API Client ──────────────────────────────────────────────────────────────
 const lessonsApi = new LessonsApi(
   new Configuration({
     basePath: API_BASE_URL,
     accessToken: async () =>
-      (await SecureStore.getItemAsync(STORAGE_KEYS.ACCESS_TOKEN)) || "",
+      (await StorageService.getItem(STORAGE_KEYS.ACCESS_TOKEN)) || "",
   }),
   API_BASE_URL,
   api,
@@ -107,7 +110,10 @@ export default function TopicsScreen() {
   });
 
   const error = isError
-    ? getRequestErrorMessage(queryError, "An error occurred while fetching topics.")
+    ? getRequestErrorMessage(
+        queryError,
+        "An error occurred while fetching topics.",
+      )
     : null;
 
   // Grouping lessons into the SubjectTopics structure
@@ -125,7 +131,9 @@ export default function TopicsScreen() {
         strand: lesson.strand || lesson.category || null,
         completed: lesson.isCompleted ?? false,
         // Preserve API order when an older response does not include orderIndex.
-        orderIndex: Number.isFinite(Number(lesson.orderIndex)) ? Number(lesson.orderIndex) : sourceIndex,
+        orderIndex: Number.isFinite(Number(lesson.orderIndex))
+          ? Number(lesson.orderIndex)
+          : sourceIndex,
       });
     });
 
@@ -185,9 +193,7 @@ export default function TopicsScreen() {
   if (isLoading && lessons.length === 0) {
     return (
       <View style={styles.container}>
-        {isFocused && (
-          <StatusBar style="dark" />
-        )}
+        {isFocused && <StatusBar style="dark" />}
         <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
           <Pressable onPress={() => router.back()} style={styles.backButton}>
             <Ionicons name="arrow-back" size={24} color="#0F172A" />
@@ -210,10 +216,14 @@ export default function TopicsScreen() {
       onPress={() => handleTopicPress(topic)}
     >
       <View style={styles.topicInfo}>
-        <Text style={styles.topicTitle} numberOfLines={3}>{topic.title}</Text>
+        <Text style={styles.topicTitle} numberOfLines={3}>
+          {topic.title}
+        </Text>
         {!!topic.strand && (
           <View style={styles.strandTag}>
-            <Text style={styles.strandTagText} numberOfLines={1}>{topic.strand}</Text>
+            <Text style={styles.strandTagText} numberOfLines={1}>
+              {topic.strand}
+            </Text>
           </View>
         )}
       </View>
@@ -227,7 +237,9 @@ export default function TopicsScreen() {
     <View style={styles.weekSection}>
       <View style={styles.weekHeader}>
         <Text style={styles.weekTitle}>Week {item.weekNumber}</Text>
-        <Text style={styles.topicCount}>{item.topics.length} {item.topics.length === 1 ? "topic" : "topics"}</Text>
+        <Text style={styles.topicCount}>
+          {item.topics.length} {item.topics.length === 1 ? "topic" : "topics"}
+        </Text>
       </View>
       <View style={styles.topicsList}>{item.topics.map(renderTopic)}</View>
     </View>
@@ -259,9 +271,7 @@ export default function TopicsScreen() {
 
   return (
     <View style={styles.container}>
-      {isFocused && (
-        <StatusBar style="dark" />
-      )}
+      {isFocused && <StatusBar style="dark" />}
 
       {/* Header with Top Inset */}
       <View style={[styles.header, { paddingTop: insets.top + 12 }]}>

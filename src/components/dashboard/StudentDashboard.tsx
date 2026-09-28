@@ -24,7 +24,7 @@ import { UpcomingActivitiesCard } from "./UpcomingActivitiesCard";
 const accountApi = new AccountApi(
   new Configuration({ basePath: API_BASE_URL }),
   API_BASE_URL,
-  api
+  api,
 );
 
 // Stitch Design Tokens
@@ -50,22 +50,25 @@ export default function StudentDashboard() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user } = useAuth();
-  
+
   // Fetch actual profile data (cached by React Query)
   const { data: profileData = null } = useQuery({
     queryKey: ["profile", user?.id || "anonymous"],
     queryFn: async () => {
       const response = await accountApi.getMyProfile();
       if (!response.data.success || !response.data.data) {
-        throw new Error(getApiErrorMessage(response.data, "Failed to load profile"));
+        throw new Error(
+          getApiErrorMessage(response.data, "Failed to load profile"),
+        );
       }
       return response.data.data;
     },
     enabled: !!user,
   });
 
-  const firstName = profileData?.firstName || user?.name?.split(' ')[0] || "Student";
-  
+  const firstName =
+    profileData?.firstName || user?.name?.split(" ")[0] || "Student";
+
   const [isScheduleModalVisible, setScheduleModalVisible] = useState(false);
   const [isActivitiesModalVisible, setActivitiesModalVisible] = useState(false);
 
@@ -76,36 +79,39 @@ export default function StudentDashboard() {
   return (
     <View style={styles.container}>
       <StatusBar style="dark" />
-      
+
       {/* Top Header */}
-      <View
-        style={[
-          styles.header,
-          { paddingTop: Math.max(insets.top, 20) }
-        ]}
-      >
+      <View style={[styles.header, { paddingTop: Math.max(insets.top, 20) }]}>
         <View style={styles.headerLeft}>
           <Image
-            source={{ uri: "https://api.dicebear.com/7.x/avataaars/png?seed=" + firstName }}
+            source={{
+              uri:
+                "https://api.dicebear.com/7.x/avataaars/png?seed=" + firstName,
+            }}
             style={styles.avatar}
           />
         </View>
         <Pressable style={styles.notificationBtn}>
-          <Ionicons name="notifications-outline" size={24} color={STITCH_COLORS.primary} />
+          <Ionicons
+            name="notifications-outline"
+            size={24}
+            color={STITCH_COLORS.primary}
+          />
           <View style={styles.notificationBadge} />
         </Pressable>
       </View>
 
       <ScrollView
         style={styles.scrollView}
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 80 }]}
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingBottom: insets.bottom + 80 },
+        ]}
         showsVerticalScrollIndicator={false}
       >
         {/* Main Greeting Section */}
         <View style={styles.mainGreeting}>
-          <Text style={styles.greetingTitle}>
-            Good Morning, {firstName}
-          </Text>
+          <Text style={styles.greetingTitle}>Good Morning, {firstName}</Text>
           <Text style={styles.greetingSubtitle}>
             {user?.currentTerm || "Current Term"} • 3 Classes Left
           </Text>
@@ -119,7 +125,11 @@ export default function StudentDashboard() {
               <Text style={styles.cardSubtitle}>This Month</Text>
             </View>
             <View style={styles.iconContainerPrimary}>
-              <Ionicons name="checkmark-circle-outline" size={20} color={STITCH_COLORS.primary} />
+              <Ionicons
+                name="checkmark-circle-outline"
+                size={20}
+                color={STITCH_COLORS.primary}
+              />
             </View>
           </View>
 
@@ -129,7 +139,11 @@ export default function StudentDashboard() {
             </View>
             <View style={styles.streakContainer}>
               <View style={styles.streakRow}>
-                <Ionicons name="flame" size={20} color={STITCH_COLORS.tertiary} />
+                <Ionicons
+                  name="flame"
+                  size={20}
+                  color={STITCH_COLORS.tertiary}
+                />
                 <Text style={styles.streakText}>12 Day Streak</Text>
               </View>
               <Text style={styles.streakSubtext}>Excellent consistency.</Text>
@@ -137,12 +151,19 @@ export default function StudentDashboard() {
           </View>
 
           <View style={styles.chartContainer}>
-            {['M', 'T', 'W', 'T', 'F'].map((day, index) => (
+            {["M", "T", "W", "T", "F"].map((day, index) => (
               <View key={index} style={styles.chartBarWrapper}>
-                <View style={[
-                  styles.chartBar, 
-                  index === 4 ? { height: '50%', backgroundColor: STITCH_COLORS.surfaceContainerHigh } : { height: '100%' }
-                ]} />
+                <View
+                  style={[
+                    styles.chartBar,
+                    index === 4
+                      ? {
+                          height: "50%",
+                          backgroundColor: STITCH_COLORS.surfaceContainerHigh,
+                        }
+                      : { height: "100%" },
+                  ]}
+                />
                 <Text style={styles.chartDayText}>{day}</Text>
               </View>
             ))}
@@ -155,31 +176,43 @@ export default function StudentDashboard() {
             <View>
               <Text style={styles.cardTitle}>Today's Schedule</Text>
             </View>
-            <Pressable onPress={() => setScheduleModalVisible(true)} style={styles.viewAllBtn}>
+            <Pressable
+              onPress={() => setScheduleModalVisible(true)}
+              style={styles.viewAllBtn}
+            >
               <Text style={styles.linkText}>View All</Text>
             </Pressable>
           </View>
 
-          <Pressable style={styles.ongoingClassCard} onPress={() => setScheduleModalVisible(true)}>
+          <Pressable
+            style={styles.ongoingClassCard}
+            onPress={() => setScheduleModalVisible(true)}
+          >
             <View style={styles.ongoingHeader}>
               <View style={styles.ongoingLeft}>
                 <View style={styles.ongoingIcon}>
-                  <Ionicons name="calculator" size={24} color={STITCH_COLORS.onPrimaryContainer} />
+                  <Ionicons
+                    name="calculator"
+                    size={24}
+                    color={STITCH_COLORS.onPrimaryContainer}
+                  />
                 </View>
                 <View style={{ flexShrink: 1 }}>
                   <View style={styles.statusBadge}>
                     <Text style={styles.statusBadgeText}>ONGOING</Text>
                   </View>
                   <Text style={styles.ongoingTitle}>Mathematics</Text>
-                  <Text style={styles.ongoingSubtitle}>Mr. Benson • Room 4B • 09:00 - 10:00</Text>
+                  <Text style={styles.ongoingSubtitle}>
+                    Mr. Benson • Room 4B • 09:00 - 10:00
+                  </Text>
                 </View>
               </View>
             </View>
 
             <View style={styles.progressBarBg}>
-              <View style={[styles.progressBarFill, { width: '65%' }]} />
+              <View style={[styles.progressBarFill, { width: "65%" }]} />
             </View>
-            
+
             <View style={styles.progressTextRow}>
               <Text style={styles.progressTimeText}>40m elapsed</Text>
               <Text style={styles.progressTimeText}>20m remaining</Text>
@@ -193,24 +226,43 @@ export default function StudentDashboard() {
         {/* 4. Quick Actions */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Quick Actions</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.quickActionsContainer}>
-            <Pressable style={styles.actionItem} onPress={handleNavigateToSubjects}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.quickActionsContainer}
+          >
+            <Pressable
+              style={styles.actionItem}
+              onPress={handleNavigateToSubjects}
+            >
               <View style={styles.actionIconContainer}>
-                <Ionicons name="library-outline" size={24} color={STITCH_COLORS.primary} />
+                <Ionicons
+                  name="library-outline"
+                  size={24}
+                  color={STITCH_COLORS.primary}
+                />
               </View>
               <Text style={styles.actionText}>My Subjects</Text>
             </Pressable>
 
             <Pressable style={styles.actionItem}>
               <View style={styles.actionIconContainer}>
-                <Ionicons name="calendar-outline" size={24} color={STITCH_COLORS.primary} />
+                <Ionicons
+                  name="calendar-outline"
+                  size={24}
+                  color={STITCH_COLORS.primary}
+                />
               </View>
               <Text style={styles.actionText}>Timetable</Text>
             </Pressable>
 
             <Pressable style={styles.actionItem}>
               <View style={styles.actionIconContainer}>
-                <Ionicons name="document-text-outline" size={24} color={STITCH_COLORS.primary} />
+                <Ionicons
+                  name="document-text-outline"
+                  size={24}
+                  color={STITCH_COLORS.primary}
+                />
               </View>
               <Text style={styles.actionText}>Notes</Text>
             </Pressable>
@@ -228,21 +280,35 @@ export default function StudentDashboard() {
               <Ionicons name="warning" size={20} color={STITCH_COLORS.error} />
             </View>
             <View style={styles.assignmentContent}>
-              <Text style={styles.assignmentTitle}>English Literature Essay</Text>
+              <Text style={styles.assignmentTitle}>
+                English Literature Essay
+              </Text>
               <Text style={styles.assignmentMeta}>
-                <Ionicons name="time-outline" size={12} /> Due Today • <Text style={{ color: STITCH_COLORS.error }}>Priority: High</Text>
+                <Ionicons name="time-outline" size={12} /> Due Today •{" "}
+                <Text style={{ color: STITCH_COLORS.error }}>
+                  Priority: High
+                </Text>
               </Text>
             </View>
           </View>
 
           <View style={styles.assignmentItemNormal}>
             <View style={styles.assignmentIconNormal}>
-              <Ionicons name="checkmark-circle" size={20} color={STITCH_COLORS.primary} />
+              <Ionicons
+                name="checkmark-circle"
+                size={20}
+                color={STITCH_COLORS.primary}
+              />
             </View>
             <View style={styles.assignmentContent}>
-              <Text style={[styles.assignmentTitle, styles.strikeThrough]}>History Quiz</Text>
+              <Text style={[styles.assignmentTitle, styles.strikeThrough]}>
+                History Quiz
+              </Text>
               <Text style={styles.assignmentMeta}>
-                <Text style={{ color: STITCH_COLORS.primary }}><Ionicons name="checkmark-done" size={12} /> Submitted</Text> • Yesterday
+                <Text style={{ color: STITCH_COLORS.primary }}>
+                  <Ionicons name="checkmark-done" size={12} /> Submitted
+                </Text>{" "}
+                • Yesterday
               </Text>
             </View>
           </View>
@@ -257,20 +323,40 @@ export default function StudentDashboard() {
         onRequestClose={() => setScheduleModalVisible(false)}
       >
         <View style={styles.modalOverlay}>
-          <Pressable style={styles.modalBackdrop} onPress={() => setScheduleModalVisible(false)} />
-          <View style={[styles.modalContent, { paddingBottom: Math.max(insets.bottom, 24) }]}>
+          <Pressable
+            style={styles.modalBackdrop}
+            onPress={() => setScheduleModalVisible(false)}
+            hitSlop={12}
+          />
+          <View
+            style={[
+              styles.modalContent,
+              { paddingBottom: Math.max(insets.bottom, 24) },
+            ]}
+          >
             <View style={styles.modalDragIndicator} />
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Remaining Classes</Text>
-              <Pressable onPress={() => setScheduleModalVisible(false)} style={styles.modalCloseBtn}>
-                <Ionicons name="close" size={24} color={STITCH_COLORS.onSurfaceVariant} />
+              <Pressable
+                onPress={() => setScheduleModalVisible(false)}
+                style={styles.modalCloseBtn}
+              >
+                <Ionicons
+                  name="close"
+                  size={24}
+                  color={STITCH_COLORS.onSurfaceVariant}
+                />
               </Pressable>
             </View>
 
             <View style={styles.modalBody}>
               <View style={styles.remainingClassItem}>
                 <View style={styles.remainingClassIcon}>
-                  <Ionicons name="flask-outline" size={24} color={STITCH_COLORS.onSurface} />
+                  <Ionicons
+                    name="flask-outline"
+                    size={24}
+                    color={STITCH_COLORS.onSurface}
+                  />
                 </View>
                 <View style={styles.remainingClassInfo}>
                   <Text style={styles.remainingClassTime}>10:15 - 11:15</Text>
@@ -281,11 +367,17 @@ export default function StudentDashboard() {
 
               <View style={styles.remainingClassItem}>
                 <View style={styles.remainingClassIcon}>
-                  <Ionicons name="book-outline" size={24} color={STITCH_COLORS.onSurface} />
+                  <Ionicons
+                    name="book-outline"
+                    size={24}
+                    color={STITCH_COLORS.onSurface}
+                  />
                 </View>
                 <View style={styles.remainingClassInfo}>
                   <Text style={styles.remainingClassTime}>11:30 - 12:30</Text>
-                  <Text style={styles.remainingClassName}>English Literature</Text>
+                  <Text style={styles.remainingClassName}>
+                    English Literature
+                  </Text>
                   <Text style={styles.remainingClassRoom}>Room 1B</Text>
                 </View>
               </View>
@@ -302,35 +394,68 @@ export default function StudentDashboard() {
         onRequestClose={() => setActivitiesModalVisible(false)}
       >
         <View style={styles.modalOverlay}>
-          <Pressable style={styles.modalBackdrop} onPress={() => setActivitiesModalVisible(false)} />
-          <View style={[styles.modalContent, { paddingBottom: Math.max(insets.bottom, 24) }]}>
+          <Pressable
+            style={styles.modalBackdrop}
+            onPress={() => setActivitiesModalVisible(false)}
+          />
+          <View
+            style={[
+              styles.modalContent,
+              { paddingBottom: Math.max(insets.bottom, 24) },
+            ]}
+          >
             <View style={styles.modalDragIndicator} />
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Upcoming Activities</Text>
-              <Pressable onPress={() => setActivitiesModalVisible(false)} style={styles.modalCloseBtn}>
-                <Ionicons name="close" size={24} color={STITCH_COLORS.onSurfaceVariant} />
+              <Pressable
+                onPress={() => setActivitiesModalVisible(false)}
+                style={styles.modalCloseBtn}
+              >
+                <Ionicons
+                  name="close"
+                  size={24}
+                  color={STITCH_COLORS.onSurfaceVariant}
+                />
               </Pressable>
             </View>
 
             <View style={styles.modalBody}>
               <View style={styles.remainingClassItem}>
                 <View style={styles.remainingClassIcon}>
-                  <Ionicons name="timer-outline" size={24} color={STITCH_COLORS.onSurface} />
+                  <Ionicons
+                    name="timer-outline"
+                    size={24}
+                    color={STITCH_COLORS.onSurface}
+                  />
                 </View>
                 <View style={styles.remainingClassInfo}>
-                  <Text style={styles.remainingClassTime}>Oct 12 • 09:00 AM</Text>
-                  <Text style={styles.remainingClassName}>Science Mid-term</Text>
-                  <Text style={styles.remainingClassRoom}>Room 1C • Comprehensive Exam</Text>
+                  <Text style={styles.remainingClassTime}>
+                    Oct 12 • 09:00 AM
+                  </Text>
+                  <Text style={styles.remainingClassName}>
+                    Science Mid-term
+                  </Text>
+                  <Text style={styles.remainingClassRoom}>
+                    Room 1C • Comprehensive Exam
+                  </Text>
                 </View>
               </View>
 
               <View style={styles.remainingClassItem}>
                 <View style={styles.remainingClassIcon}>
-                  <Ionicons name="football-outline" size={24} color={STITCH_COLORS.onSurface} />
+                  <Ionicons
+                    name="football-outline"
+                    size={24}
+                    color={STITCH_COLORS.onSurface}
+                  />
                 </View>
                 <View style={styles.remainingClassInfo}>
-                  <Text style={styles.remainingClassTime}>Oct 15 • 03:00 PM</Text>
-                  <Text style={styles.remainingClassName}>Inter-House Sports</Text>
+                  <Text style={styles.remainingClassTime}>
+                    Oct 15 • 03:00 PM
+                  </Text>
+                  <Text style={styles.remainingClassName}>
+                    Inter-House Sports
+                  </Text>
                   <Text style={styles.remainingClassRoom}>Main Field</Text>
                 </View>
               </View>
@@ -760,12 +885,14 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
+    backgroundColor: "rgba(0, 0, 0, 0.36)",
   },
   modalContent: {
     backgroundColor: STITCH_COLORS.surfaceContainerLowest,
     borderTopLeftRadius: 32,
     borderTopRightRadius: 32,
     padding: 24,
+    zIndex: 1,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: -8 },
     shadowOpacity: 0.15,
@@ -793,9 +920,13 @@ const styles = StyleSheet.create({
     color: STITCH_COLORS.onSurface,
   },
   modalCloseBtn: {
+    minWidth: 40,
+    minHeight: 40,
     padding: 8,
     backgroundColor: STITCH_COLORS.surfaceContainerLow,
     borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
   },
   modalBody: {
     gap: 12,

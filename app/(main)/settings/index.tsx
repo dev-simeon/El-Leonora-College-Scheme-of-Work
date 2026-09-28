@@ -98,6 +98,7 @@ const SettingRow = ({
     ]}
     onPress={onPress}
     android_ripple={{ color: "#F1F5F9" }}
+    hitSlop={8}
   >
     <View style={[styles.rowIconWrap, { backgroundColor: iconBg }]}>
       <Ionicons name={icon as any} size={20} color={iconColor} />
@@ -194,9 +195,7 @@ export default function SettingsScreen() {
 
   return (
     <SafeAreaView style={styles.safeContainer} edges={["left", "right"]}>
-      {isFocused && (
-        <StatusBar style="light" />
-      )}
+      {isFocused && <StatusBar style="light" />}
 
       <ScrollView
         style={styles.scrollView}
@@ -634,6 +633,7 @@ const styles = StyleSheet.create({
   listItem: {
     flexDirection: "row",
     alignItems: "center",
+    minHeight: 56,
     paddingVertical: 15,
     paddingHorizontal: 16,
     gap: 12,
@@ -673,6 +673,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "rgba(0, 0, 0, 0.5)",
     justifyContent: "flex-end",
+    position: "relative",
   },
   qrSheet: {
     backgroundColor: "#FFFFFF",
@@ -682,6 +683,7 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     paddingBottom: 40,
     alignItems: "center",
+    zIndex: 1,
   },
   qrHandle: {
     width: 40,

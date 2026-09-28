@@ -20,7 +20,7 @@ import { useRouter } from "expo-router";
 import { AccountApi } from "../../../src/api/generated/endpoints/account-api";
 import { Configuration } from "../../../src/api/generated/configuration";
 import api, { API_BASE_URL, STORAGE_KEYS } from "../../../src/services/api";
-import * as SecureStore from "expo-secure-store";
+import { StorageService } from "../../../src/services/storage";
 import { useToast } from "../../../src/context/ToastContext";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "../../../src/context/AuthContext";
@@ -35,7 +35,7 @@ const accountApi = new AccountApi(
   new Configuration({
     basePath: API_BASE_URL,
     accessToken: async () =>
-      (await SecureStore.getItemAsync(STORAGE_KEYS.ACCESS_TOKEN)) || "",
+      (await StorageService.getItem(STORAGE_KEYS.ACCESS_TOKEN)) || "",
   }),
   API_BASE_URL,
   api,

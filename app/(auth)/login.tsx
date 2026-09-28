@@ -10,8 +10,6 @@ import {
   Alert,
   Platform,
   KeyboardAvoidingView,
-  TouchableWithoutFeedback,
-  Keyboard,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
@@ -30,6 +28,9 @@ export default function LoginScreen() {
   const [selectedRole, setSelectedRole] = useState<UserRole>("student");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [focusedField, setFocusedField] = useState<
+    "studentId" | "email" | "password" | null
+  >(null);
 
   // Form values
   const [studentId, setStudentId] = useState("");
@@ -49,7 +50,10 @@ export default function LoginScreen() {
         return;
       }
       if (!email.includes("@")) {
-        showToast({ message: "Please enter a valid email address", type: "error" });
+        showToast({
+          message: "Please enter a valid email address",
+          type: "error",
+        });
         return;
       }
     }
@@ -65,21 +69,23 @@ export default function LoginScreen() {
       if (selectedRole === "student") {
         await studentLogin({
           admissionNumber: studentId.trim(),
-          password
+          password,
         });
       } else {
         await staffLogin({
           username: email.trim(),
-          password
+          password,
         });
       }
 
       router.push("/(main)/home");
-      showToast({ message: "Login successful! Welcome back.", type: "success" });
+      showToast({
+        message: "Login successful! Welcome back.",
+        type: "success",
+      });
     } catch (error: any) {
       const message =
-        error.message ??
-        "Login failed. Please check your credentials.";
+        error.message ?? "Login failed. Please check your credentials.";
       showToast({ message, type: "error" });
     } finally {
       setIsLoading(false);
@@ -92,132 +98,240 @@ export default function LoginScreen() {
       <SafeAreaView style={styles.safeContainer} edges={["top", "bottom"]}>
         <KeyboardAvoidingView
           behavior={Platform.OS === "ios" ? "padding" : "height"}
+          keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 24}
           style={{ flex: 1 }}
         >
-          <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-            <View style={styles.container}>
-              {/* Header */}
-              <View style={styles.header}>
-                <Text style={styles.headerTitle}>Login</Text>
-              </View>
+          <View style={styles.container}>
+            <View style={styles.header}>
+              <Text style={styles.headerTitle}>Login</Text>
+            </View>
 
-              {/* Branding Section */}
-              <View style={styles.brandingSection}>
-                <View style={styles.iconContainer}>
-                  <MaterialCommunityIcons name="school" size={36} color="#135BEC" />
-                </View>
-                <Text style={styles.mainTitle}>Join El-Leonora College</Text>
-                <Text style={styles.subtitle}>Access your scheme of work instantly.</Text>
+            <View style={styles.brandingSection}>
+              <View style={styles.iconContainer}>
+                <MaterialCommunityIcons
+                  name="school"
+                  size={36}
+                  color="#135BEC"
+                />
               </View>
+              <Text style={styles.mainTitle}>Join El-Leonora College</Text>
+              <Text style={styles.subtitle}>
+                Access your scheme of work instantly.
+              </Text>
+            </View>
 
-              <ScrollView
-                style={styles.scrollView}
-                contentContainerStyle={styles.scrollContent}
-                showsVerticalScrollIndicator={false}
-                keyboardShouldPersistTaps="handled"
-              >
-                <View style={styles.form}>
-                  <View style={styles.formGroup}>
-                    <Text style={styles.label}>Log in as</Text>
-                    <View style={styles.roleSwitch}>
-                      <Pressable
-                        style={styles.roleOption}
-                        onPress={() => setSelectedRole("student")}
+            <ScrollView
+              style={styles.scrollView}
+              contentContainerStyle={[
+                styles.scrollContent,
+                { paddingBottom: 32 },
+              ]}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              nestedScrollEnabled={Platform.OS === "android"}
+            >
+              <View style={styles.form}>
+                <View style={styles.formGroup}>
+                  <Text style={styles.label}>Log in as</Text>
+                  <View style={styles.roleSwitch}>
+                    <Pressable
+                      style={styles.roleOption}
+                      onPress={() => setSelectedRole("student")}
+                    >
+                      <View
+                        style={[
+                          styles.roleOptionInner,
+                          selectedRole === "student" && styles.roleOptionActive,
+                        ]}
                       >
-                        <View style={[styles.roleOptionInner, selectedRole === "student" && styles.roleOptionActive]}>
-                          <Text style={[styles.roleText, selectedRole === "student" && styles.roleTextActive]}>Student</Text>
-                        </View>
-                      </Pressable>
-                      <Pressable
-                        style={styles.roleOption}
-                        onPress={() => setSelectedRole("teacher")}
+                        <Text
+                          style={[
+                            styles.roleText,
+                            selectedRole === "student" && styles.roleTextActive,
+                          ]}
+                        >
+                          Student
+                        </Text>
+                      </View>
+                    </Pressable>
+                    <Pressable
+                      style={styles.roleOption}
+                      onPress={() => setSelectedRole("teacher")}
+                    >
+                      <View
+                        style={[
+                          styles.roleOptionInner,
+                          selectedRole === "teacher" && styles.roleOptionActive,
+                        ]}
                       >
-                        <View style={[styles.roleOptionInner, selectedRole === "teacher" && styles.roleOptionActive]}>
-                          <Text style={[styles.roleText, selectedRole === "teacher" && styles.roleTextActive]}>Staff</Text>
-                        </View>
-                      </Pressable>
-                    </View>
+                        <Text
+                          style={[
+                            styles.roleText,
+                            selectedRole === "teacher" && styles.roleTextActive,
+                          ]}
+                        >
+                          Staff
+                        </Text>
+                      </View>
+                    </Pressable>
                   </View>
-                  
+                </View>
+
+                <View style={{ height: 12 }} />
+
+                <View>
+                  {selectedRole === "student" ? (
+                    <View style={styles.formGroup}>
+                      <Text style={styles.label}>Admission ID</Text>
+                      <View
+                        style={[
+                          styles.inputContainer,
+                          focusedField === "studentId" &&
+                            styles.inputContainerFocused,
+                        ]}
+                      >
+                        <Ionicons
+                          name="card-outline"
+                          size={20}
+                          color="#9CA3AF"
+                          style={styles.inputIconLeft}
+                        />
+                        <TextInput
+                          style={[
+                            styles.input,
+                            Platform.OS === "web" &&
+                              ({ outline: "none" } as any),
+                          ]}
+                          placeholder="ELC/ADM/2023/001"
+                          placeholderTextColor="#9CA3AF"
+                          value={studentId}
+                          onChangeText={setStudentId}
+                          onFocus={() => setFocusedField("studentId")}
+                          onBlur={() =>
+                            setFocusedField((current) =>
+                              current === "studentId" ? null : current,
+                            )
+                          }
+                          autoCapitalize="characters"
+                          autoCorrect={false}
+                          selectionColor="#135BEC"
+                        />
+                      </View>
+                    </View>
+                  ) : (
+                    <View style={styles.formGroup}>
+                      <Text style={styles.label}>Email Address</Text>
+                      <View
+                        style={[
+                          styles.inputContainer,
+                          focusedField === "email" &&
+                            styles.inputContainerFocused,
+                        ]}
+                      >
+                        <Ionicons
+                          name="mail-outline"
+                          size={20}
+                          color="#9CA3AF"
+                          style={styles.inputIconLeft}
+                        />
+                        <TextInput
+                          style={[
+                            styles.input,
+                            Platform.OS === "web" &&
+                              ({ outline: "none" } as any),
+                          ]}
+                          placeholder="teacher@elleonora.com"
+                          placeholderTextColor="#9CA3AF"
+                          keyboardType="email-address"
+                          value={email}
+                          onChangeText={setEmail}
+                          onFocus={() => setFocusedField("email")}
+                          onBlur={() =>
+                            setFocusedField((current) =>
+                              current === "email" ? null : current,
+                            )
+                          }
+                          autoCapitalize="none"
+                          autoCorrect={false}
+                          selectionColor="#135BEC"
+                        />
+                      </View>
+                    </View>
+                  )}
+
                   <View style={{ height: 12 }} />
 
-                  <View>
-                    {selectedRole === "student" ? (
-                      <View style={styles.formGroup}>
-                        <Text style={styles.label}>Admission ID</Text>
-                        <View style={styles.inputContainer}>
-                          <Ionicons name="card-outline" size={20} color="#9CA3AF" style={styles.inputIconLeft} />
-                          <TextInput
-                            style={styles.input}
-                            placeholder="ELC/ADM/2023/001"
-                            placeholderTextColor="#9CA3AF"
-                            value={studentId}
-                            onChangeText={setStudentId}
-                            autoCapitalize="characters"
-                          />
-                        </View>
-                      </View>
-                    ) : (
-                      <View style={styles.formGroup}>
-                        <Text style={styles.label}>Email Address</Text>
-                        <View style={styles.inputContainer}>
-                          <Ionicons name="mail-outline" size={20} color="#9CA3AF" style={styles.inputIconLeft} />
-                          <TextInput
-                            style={styles.input}
-                            placeholder="teacher@elleonora.com"
-                            placeholderTextColor="#9CA3AF"
-                            keyboardType="email-address"
-                            value={email}
-                            onChangeText={setEmail}
-                            autoCapitalize="none"
-                          />
-                        </View>
-                      </View>
-                    )}
-
-                    <View style={{ height: 12 }} />
-
-                    <View style={styles.formGroup}>
-                      <Text style={styles.label}>Password</Text>
-                      <View style={styles.inputContainer}>
-                        <Ionicons name="lock-closed-outline" size={20} color="#9CA3AF" style={styles.inputIconLeft} />
-                        <TextInput
-                          style={styles.input}
-                          placeholder="••••••••"
-                          placeholderTextColor="#9CA3AF"
-                          secureTextEntry={!showPassword}
-                          value={password}
-                          onChangeText={setPassword}
+                  <View style={styles.formGroup}>
+                    <Text style={styles.label}>Password</Text>
+                    <View
+                      style={[
+                        styles.inputContainer,
+                        focusedField === "password" &&
+                          styles.inputContainerFocused,
+                      ]}
+                    >
+                      <Ionicons
+                        name="lock-closed-outline"
+                        size={20}
+                        color="#9CA3AF"
+                        style={styles.inputIconLeft}
+                      />
+                      <TextInput
+                        style={[
+                          styles.input,
+                          Platform.OS === "web" && ({ outline: "none" } as any),
+                        ]}
+                        placeholder="••••••••"
+                        placeholderTextColor="#9CA3AF"
+                        secureTextEntry={!showPassword}
+                        value={password}
+                        onChangeText={setPassword}
+                        onFocus={() => setFocusedField("password")}
+                        onBlur={() =>
+                          setFocusedField((current) =>
+                            current === "password" ? null : current,
+                          )
+                        }
+                        autoCorrect={false}
+                        selectionColor="#135BEC"
+                      />
+                      <Pressable
+                        style={styles.visibilityToggle}
+                        onPress={() => setShowPassword(!showPassword)}
+                        hitSlop={8}
+                      >
+                        <Ionicons
+                          name={
+                            showPassword ? "eye-outline" : "eye-off-outline"
+                          }
+                          size={20}
+                          color="#9CA3AF"
+                          style={styles.inputIconRight}
                         />
-                        <Pressable onPress={() => setShowPassword(!showPassword)}>
-                          <Ionicons
-                            name={showPassword ? "eye-outline" : "eye-off-outline"}
-                            size={20}
-                            color="#9CA3AF"
-                            style={styles.inputIconRight}
-                          />
-                        </Pressable>
-                      </View>
+                      </Pressable>
                     </View>
                   </View>
                 </View>
-              </ScrollView>
-
-              <View style={styles.buttonContainer}>
-                <Pressable
-                  style={[styles.submitButton, isLoading && styles.submitButtonDisabled]}
-                  disabled={isLoading}
-                  onPress={handleLogin}
-                >
-                  {isLoading ? (
-                    <ActivityIndicator size="small" color="#FFFFFF" />
-                  ) : (
-                    <Text style={styles.submitButtonText}>Login</Text>
-                  )}
-                </Pressable>
               </View>
+            </ScrollView>
+
+            <View style={styles.buttonContainer}>
+              <Pressable
+                style={[
+                  styles.submitButton,
+                  isLoading && styles.submitButtonDisabled,
+                ]}
+                disabled={isLoading}
+                onPress={handleLogin}
+              >
+                {isLoading ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.submitButtonText}>Login</Text>
+                )}
+              </Pressable>
             </View>
-          </TouchableWithoutFeedback>
+          </View>
         </KeyboardAvoidingView>
       </SafeAreaView>
     </>
@@ -290,10 +404,14 @@ const styles = StyleSheet.create({
   },
   roleOption: {
     flex: 1,
+    minHeight: 48,
   },
   roleOptionInner: {
+    flex: 1,
+    minHeight: 48,
     paddingVertical: 10,
     alignItems: "center",
+    justifyContent: "center",
     borderRadius: 8,
   },
   roleOptionActive: {
@@ -318,8 +436,19 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "#F3F4F6",
     borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "transparent",
     paddingHorizontal: 16,
     height: 56,
+  },
+  inputContainerFocused: {
+    borderColor: "#135BEC",
+    backgroundColor: "#FFFFFF",
+    shadowColor: "#135BEC",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 2,
   },
   inputIconLeft: {
     marginRight: 12,
@@ -327,10 +456,19 @@ const styles = StyleSheet.create({
   inputIconRight: {
     marginLeft: 12,
   },
+  visibilityToggle: {
+    minWidth: 40,
+    minHeight: 40,
+    justifyContent: "center",
+    alignItems: "center",
+  },
   input: {
     flex: 1,
     fontSize: 16,
     color: "#111827",
+    borderWidth: 0,
+    backgroundColor: "transparent",
+    paddingVertical: 0,
   },
   buttonContainer: {
     padding: 24,

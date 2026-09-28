@@ -11,7 +11,10 @@ import {
   Alert,
   ActivityIndicator,
 } from "react-native";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -34,6 +37,7 @@ export default function UpdatePhoneScreen() {
   const [newPhone, setNewPhone] = useState("");
   const [phoneError, setPhoneError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [focusedField, setFocusedField] = useState<"old" | "new" | null>(null);
 
   const handlePhoneChange = (text: string) => {
     setNewPhone(text);
@@ -42,7 +46,10 @@ export default function UpdatePhoneScreen() {
 
   const handleUpdate = async () => {
     if (!oldPhone.trim()) {
-      showToast({ message: "Please enter your old phone number.", type: "error" });
+      showToast({
+        message: "Please enter your old phone number.",
+        type: "error",
+      });
       return;
     }
     if (!validateNigerianPhoneNumber(oldPhone)) {
@@ -52,7 +59,10 @@ export default function UpdatePhoneScreen() {
       return;
     }
     if (!newPhone.trim()) {
-      showToast({ message: "Please enter your new phone number.", type: "error" });
+      showToast({
+        message: "Please enter your new phone number.",
+        type: "error",
+      });
       return;
     }
     if (!validateNigerianPhoneNumber(newPhone)) {
@@ -62,7 +72,10 @@ export default function UpdatePhoneScreen() {
       return;
     }
     if (oldPhone.replace(/\s/g, "") === newPhone.replace(/\s/g, "")) {
-      showToast({ message: "Your old and new phone numbers cannot be the same.", type: "error" });
+      showToast({
+        message: "Your old and new phone numbers cannot be the same.",
+        type: "error",
+      });
       return;
     }
 
@@ -70,25 +83,31 @@ export default function UpdatePhoneScreen() {
     try {
       await new Promise<void>((resolve) => setTimeout(() => resolve(), 1500));
       setIsLoading(false);
-      showToast({ message: "Your phone number has been updated successfully.", type: "success" });
+      showToast({
+        message: "Your phone number has been updated successfully.",
+        type: "success",
+      });
       router.back();
     } catch (error) {
       setIsLoading(false);
-      showToast({ message: getRequestErrorMessage(error, "Failed to update phone number. Please try again."), type: "error" });
+      showToast({
+        message: getRequestErrorMessage(
+          error,
+          "Failed to update phone number. Please try again.",
+        ),
+        type: "error",
+      });
     }
   };
 
   return (
     <View style={styles.outerContainer}>
       <StatusBar style="dark" />
-      <SafeAreaView
-        style={styles.safeAreaContent}
-        edges={["left", "right"]}
-      >
+      <SafeAreaView style={styles.safeAreaContent} edges={["left", "right"]}>
         <KeyboardAvoidingView
           style={styles.container}
           behavior={Platform.OS === "ios" ? "padding" : "height"}
-          keyboardVerticalOffset={0}
+          keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 24}
         >
           {/* Header */}
           <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
@@ -99,9 +118,13 @@ export default function UpdatePhoneScreen() {
 
           <ScrollView
             style={styles.scrollView}
-            contentContainerStyle={styles.scrollContent}
+            contentContainerStyle={[
+              styles.scrollContent,
+              { paddingBottom: 40 },
+            ]}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
+            nestedScrollEnabled={Platform.OS === "android"}
           >
             {/* Icon Section */}
             <View style={styles.logoSection}>
@@ -125,17 +148,32 @@ export default function UpdatePhoneScreen() {
               {/* Old Phone */}
               <View style={styles.formGroup}>
                 <Text style={styles.label}>Old Phone Number</Text>
-                <View style={styles.inputContainer}>
+                <View
+                  style={[
+                    styles.inputContainer,
+                    focusedField === "old" && styles.inputContainerFocused,
+                  ]}
+                >
                   <View style={styles.inputIconLeft}>
                     <Ionicons name="call-outline" size={20} color="#9CA3AF" />
                   </View>
                   <TextInput
-                    style={styles.input}
+                    style={[
+                      styles.input,
+                      Platform.OS === "web" && ({ outline: "none" } as any),
+                    ]}
                     placeholder="+234 800 000 0000"
                     placeholderTextColor="#9CA3AF"
                     keyboardType="phone-pad"
                     value={oldPhone}
                     onChangeText={setOldPhone}
+                    onFocus={() => setFocusedField("old")}
+                    onBlur={() =>
+                      setFocusedField((current) =>
+                        current === "old" ? null : current,
+                      )
+                    }
+                    selectionColor="#135BEC"
                   />
                 </View>
               </View>
@@ -146,6 +184,7 @@ export default function UpdatePhoneScreen() {
                 <View
                   style={[
                     styles.inputContainer,
+                    focusedField === "new" && styles.inputContainerFocused,
                     phoneError ? styles.inputContainerError : null,
                   ]}
                 >
@@ -153,12 +192,22 @@ export default function UpdatePhoneScreen() {
                     <Ionicons name="call-outline" size={20} color="#9CA3AF" />
                   </View>
                   <TextInput
-                    style={styles.input}
+                    style={[
+                      styles.input,
+                      Platform.OS === "web" && ({ outline: "none" } as any),
+                    ]}
                     placeholder="+234 800 000 0000"
                     placeholderTextColor="#9CA3AF"
                     keyboardType="phone-pad"
                     value={newPhone}
                     onChangeText={handlePhoneChange}
+                    onFocus={() => setFocusedField("new")}
+                    onBlur={() =>
+                      setFocusedField((current) =>
+                        current === "new" ? null : current,
+                      )
+                    }
+                    selectionColor="#135BEC"
                   />
                 </View>
                 {phoneError ? (
@@ -188,6 +237,7 @@ export default function UpdatePhoneScreen() {
                 ]}
                 onPress={handleUpdate}
                 disabled={isLoading}
+                hitSlop={8}
               >
                 {isLoading ? (
                   <ActivityIndicator size="small" color="#FFFFFF" />
@@ -300,6 +350,15 @@ const styles = StyleSheet.create({
     borderColor: "#E5E7EB",
     height: 52,
     paddingHorizontal: 4,
+  },
+  inputContainerFocused: {
+    borderColor: "#135BEC",
+    backgroundColor: "#FFFFFF",
+    shadowColor: "#135BEC",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 2,
   },
   inputContainerError: {
     borderColor: "#EF4444",

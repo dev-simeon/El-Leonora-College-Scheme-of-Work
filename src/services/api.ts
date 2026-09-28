@@ -1,7 +1,7 @@
 import axios, { InternalAxiosRequestConfig } from "axios";
 import globalAxios from "axios";
-import * as SecureStore from "expo-secure-store";
 import type { LoginResponseDtoApiResponse } from "../api/generated/models";
+import { StorageService } from "./storage";
 import { getApiErrorMessage, getRequestErrorDetails } from "../utils/apiError";
 
 // ─── Session-expired event bus ───────────────────────────────────────────────
@@ -36,10 +36,10 @@ const STORAGE_KEYS = {
  */
 export const clearSecureStoreAuth = async () => {
   await Promise.allSettled([
-    SecureStore.deleteItemAsync(STORAGE_KEYS.ACCESS_TOKEN),
-    SecureStore.deleteItemAsync(STORAGE_KEYS.REFRESH_TOKEN),
-    SecureStore.deleteItemAsync(STORAGE_KEYS.USER_DATA),
-    SecureStore.deleteItemAsync(STORAGE_KEYS.IS_FIRST_LOGIN),
+    StorageService.removeItem(STORAGE_KEYS.ACCESS_TOKEN),
+    StorageService.removeItem(STORAGE_KEYS.REFRESH_TOKEN),
+    StorageService.removeItem(STORAGE_KEYS.USER_DATA),
+    StorageService.removeItem(STORAGE_KEYS.IS_FIRST_LOGIN),
   ]);
 };
 
@@ -60,14 +60,14 @@ const api = axios.create({
 api.interceptors.request.use(
   async (config) => {
     try {
-      const token = await SecureStore.getItemAsync(STORAGE_KEYS.ACCESS_TOKEN);
+      const token = await StorageService.getItem(STORAGE_KEYS.ACCESS_TOKEN);
 
       console.log(
         ">>> [AXIOS REQUEST]",
         config.method?.toUpperCase(),
         config.url,
       );
-      console.log("    Token exists in SecureStore:", !!token);
+      console.log("    Token exists in storage:", !!token);
 
       if (token) {
         // Axios 1.x headers are a specialized object, but we can still set them like this
@@ -146,7 +146,7 @@ api.interceptors.response.use(
     isRefreshing = true;
 
     try {
-      const storedRefreshToken = await SecureStore.getItemAsync(
+      const storedRefreshToken = await StorageService.getItem(
         STORAGE_KEYS.REFRESH_TOKEN,
       );
 
@@ -182,11 +182,10 @@ api.interceptors.response.use(
       console.log("[api] Token refreshed successfully.");
 
       // Persist updated tokens
-      await SecureStore.setItemAsync(STORAGE_KEYS.ACCESS_TOKEN, accessToken);
-      await SecureStore.setItemAsync(
-        STORAGE_KEYS.REFRESH_TOKEN,
-        newRefreshToken,
-      );
+      await Promise.all([
+        StorageService.setItem(STORAGE_KEYS.ACCESS_TOKEN, accessToken),
+        StorageService.setItem(STORAGE_KEYS.REFRESH_TOKEN, newRefreshToken),
+      ]);
 
       // Unblock all queued requests with the new access token
       processQueue(null, accessToken);
