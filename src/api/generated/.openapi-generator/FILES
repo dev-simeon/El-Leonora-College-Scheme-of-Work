@@ -26,6 +26,7 @@ models/academic-session-dto-api-response.ts
 models/academic-session-dto-list-api-response.ts
 models/academic-session-dto.ts
 models/api-pagination-info.ts
+models/app-version-history-dto-api-paged-response.ts
 models/app-version-response-dto-api-response.ts
 models/app-version-response-dto.ts
 models/assign-teacher-subjects-dto.ts
@@ -45,6 +46,8 @@ models/class-info-dto.ts
 models/class-subject-dto-list-api-response.ts
 models/class-subject-dto.ts
 models/class-teacher-dto.ts
+models/classroom-attendance-student-response-api-paged-response.ts
+models/classroom-attendance-student-response.ts
 models/create-academic-session-request.ts
 models/create-class-fee-dto.ts
 models/create-guardian-dto.ts

@@ -2,7 +2,7 @@ import axios, { InternalAxiosRequestConfig } from "axios";
 import globalAxios from "axios";
 import type { LoginResponseDtoApiResponse } from "../api/generated/models";
 import { StorageService } from "./storage";
-import { getApiErrorMessage, getRequestErrorDetails } from "../utils/apiError";
+import { getApiErrorMessage } from "../utils/apiError";
 
 // ─── Session-expired event bus ───────────────────────────────────────────────
 // api.ts has no access to React state, so we use a plain pub/sub to notify
@@ -59,38 +59,20 @@ const api = axios.create({
 // Attach the access token as a Bearer header on every outgoing request.
 api.interceptors.request.use(
   async (config) => {
-    try {
-      const token = await StorageService.getItem(STORAGE_KEYS.ACCESS_TOKEN);
+    const token = await StorageService.getItem(STORAGE_KEYS.ACCESS_TOKEN);
 
-      console.log(
-        ">>> [AXIOS REQUEST]",
-        config.method?.toUpperCase(),
-        config.url,
-      );
-      console.log("    Token exists in storage:", !!token);
+    if (token) {
+      // Axios 1.x headers are a specialized object, but we can still set them like this
+      config.headers.Authorization = `Bearer ${token}`;
 
-      if (token) {
-        // Axios 1.x headers are a specialized object, but we can still set them like this
-        config.headers.Authorization = `Bearer ${token}`;
-
-        // Also try setting it directly on the internal headers object if it exists
-        if ((config as any)._headers) {
-          (config as any)._headers["Authorization"] = `Bearer ${token}`;
-        }
-
-        console.log("    Authorization header attached.");
-      } else {
-        console.warn(
-          "    WARNING: No token found in SecureStore for this request!",
-        );
+      // Also try setting it directly on the internal headers object if it exists
+      if ((config as any)._headers) {
+        (config as any)._headers["Authorization"] = `Bearer ${token}`;
       }
-    } catch (error) {
-      console.error("[api] Request interceptor CRITICAL FAILURE:", error);
     }
     return config;
   },
   (error) => {
-    console.error("[api] Request interceptor error:", error);
     return Promise.reject(error);
   },
 );
@@ -114,13 +96,26 @@ const processQueue = (error: unknown, token: string | null) => {
   refreshQueue = [];
 };
 
+const isInvalidRefreshCredential = (error: unknown) => {
+  const requestError = error as any;
+  const status = requestError?.response?.status;
+  if (status === 401 || status === 403) return true;
+
+  const message = getApiErrorMessage(
+    requestError?.response?.data,
+    requestError?.message ?? "",
+  );
+  return /(?:refresh\s*token|token).*(?:invalid|expired|revoked|not found|missing)|(?:invalid|expired|revoked).*(?:refresh\s*token|token)/i.test(
+    message,
+  );
+};
+
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config as
       | (InternalAxiosRequestConfig & { _retry?: boolean })
       | undefined;
-    console.error("error:", getRequestErrorDetails(error, "Request failed"));
 
     // Only intercept 401 Unauthorized; skip refresh calls themselves to avoid loops
     if (
@@ -144,6 +139,7 @@ api.interceptors.response.use(
 
     originalRequest._retry = true;
     isRefreshing = true;
+    let shouldExpireSession = false;
 
     try {
       const storedRefreshToken = await StorageService.getItem(
@@ -151,10 +147,9 @@ api.interceptors.response.use(
       );
 
       if (!storedRefreshToken) {
+        shouldExpireSession = true;
         throw new Error("No refresh token available");
       }
-
-      console.log("[api] Triggering token refresh...");
 
       // Use a bare globalAxios instance (not the intercepted `api`) to avoid
       // triggering this same interceptor infinitely on a 401 refresh failure.
@@ -179,8 +174,6 @@ api.interceptors.response.use(
         throw new Error("Malformed refresh response from server");
       }
 
-      console.log("[api] Token refreshed successfully.");
-
       // Persist updated tokens
       await Promise.all([
         StorageService.setItem(STORAGE_KEYS.ACCESS_TOKEN, accessToken),
@@ -194,12 +187,12 @@ api.interceptors.response.use(
       originalRequest.headers.Authorization = `Bearer ${accessToken}`;
       return api(originalRequest);
     } catch (refreshError) {
-      console.error("[api] Token refresh failed:", refreshError);
       processQueue(refreshError, null);
 
-      // Clear all stored auth state and notify AuthContext to redirect to login
-      await clearSecureStoreAuth();
-      emitSessionExpired();
+      if (shouldExpireSession || isInvalidRefreshCredential(refreshError)) {
+        await clearSecureStoreAuth();
+        emitSessionExpired();
+      }
 
       return Promise.reject(refreshError);
     } finally {

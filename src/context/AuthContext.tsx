@@ -23,11 +23,7 @@ import {
   CLAIM_EMAIL,
   CLAIM_ACTOR,
 } from "../utils/jwt";
-import {
-  getApiErrorMessage,
-  getRequestErrorDetails,
-  getRequestErrorMessage,
-} from "../utils/apiError";
+import { getApiErrorMessage, getRequestErrorMessage } from "../utils/apiError";
 import { queryClient } from "../services/queryClient";
 
 import { AuthApi } from "../api/generated/endpoints/auth-api";
@@ -131,15 +127,6 @@ const buildUserFromPayload = (payload: ReturnType<typeof decodeJwt>): User => {
     String((payload as any)["given_name"] ?? "") ||
     "";
 
-  console.log("[Auth] Decoded Claims:", {
-    actor: actorValue,
-    role: roleValue,
-    sub: payload.sub,
-    name: nameValue,
-    rawNameClaim: payload[CLAIM_NAME],
-    allKeys: Object.keys(payload),
-  });
-
   return {
     id: payload.sub,
     name: nameValue,
@@ -173,9 +160,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   // which causes Expo Router's auth guard to redirect to the login screen.
   useEffect(() => {
     const unsubscribe = onSessionExpired(async () => {
-      console.log(
-        "[AuthContext] Session expired — clearing state and redirecting to login.",
-      );
       queryClient.clear();
       setToken(null);
       setUser(null);
@@ -207,8 +191,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       setToken(storedToken);
       setUser(userData);
       setMustChangePassword(mcp);
-    } catch (e) {
-      console.error("[AuthContext] Failed to restore session:", e);
+    } catch {
       await clearSecureStoreAuth();
     } finally {
       setIsLoading(false);
@@ -227,17 +210,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
       const effectiveMcp = mcp;
 
-      console.log("[AuthContext] Saving session...");
       await Promise.all([
         StorageService.setItem(STORAGE_KEYS.ACCESS_TOKEN, accessToken),
         StorageService.setItem(STORAGE_KEYS.REFRESH_TOKEN, refreshToken),
       ]);
 
-      console.log(
-        "[AuthContext] Session applied. Token prefix:",
-        accessToken.substring(0, 10),
-        "...",
-      );
       setToken(accessToken);
       setUser(userData);
       setMustChangePassword(effectiveMcp);
@@ -252,18 +229,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     try {
       const device = await getDeviceDetails();
 
-      console.log("[studentLogin] Request:", {
-        admissionNumber: credentials.admissionNumber,
-        device,
-        password: "***",
-      });
-
       const response = await authApi.studentLogin({
         studentLoginRequestDto: { ...credentials, device },
       });
 
       const body = response.data;
-      console.log("[studentLogin] Response:", JSON.stringify(body, null, 2));
 
       if (body.success === false || !body.data) {
         throw new Error(getApiErrorMessage(body, "Student login failed"));
@@ -276,45 +246,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
       await applySession(accessToken, refreshToken);
     } catch (error: any) {
-      console.log("[studentLogin] ERROR caught");
-      console.log("  message         :", error.message);
-      console.log("  HTTP status     :", error.response?.status);
-      console.log(
-        "  response body   :",
-        JSON.stringify(error.response?.data, null, 2),
-      );
-      console.log(
-        "  diagnostic      :",
-        getRequestErrorDetails(
-          error,
-          "An unexpected error occurred during login",
-        ),
-      );
-      console.log("  error   :", JSON.stringify(error, null, 2));
-
-      throw new Error(
+      const wrappedError = new Error(
         getRequestErrorMessage(
           error,
           "An unexpected error occurred during login",
         ),
-      );
+      ) as Error & { cause?: unknown };
+      wrappedError.cause = error;
+      throw wrappedError;
     }
   };
 
   // ── Staff login ──────────────────────────────────────────────────────────
   const staffLogin = async (credentials: LoginRequestDto) => {
     try {
-      console.log("[staffLogin] Request:", {
-        username: credentials.username,
-        password: "***",
-      });
-
       const response = await authApi.staffLogin({
         loginRequestDto: credentials,
       });
 
       const body = response.data;
-      console.log("[staffLogin] Response:", JSON.stringify(body, null, 2));
 
       if (body.success === false || !body.data) {
         throw new Error(getApiErrorMessage(body, "Staff login failed"));
@@ -327,47 +277,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
       await applySession(accessToken, refreshToken);
     } catch (error: any) {
-      console.log("[staffLogin] ERROR caught");
-      console.log("  message         :", error.message);
-      console.log("  HTTP status     :", error.response?.status);
-      console.log(
-        "  response body   :",
-        JSON.stringify(error.response?.data, null, 2),
-      );
-      console.log(
-        "  diagnostic      :",
-        getRequestErrorDetails(
-          error,
-          "An unexpected error occurred during login",
-        ),
-      );
-      console.log("  error           :", JSON.stringify(error, null, 2));
-
-      throw new Error(
+      const wrappedError = new Error(
         getRequestErrorMessage(
           error,
           "An unexpected error occurred during login",
         ),
-      );
+      ) as Error & { cause?: unknown };
+      wrappedError.cause = error;
+      throw wrappedError;
     }
   };
 
   // ── Logout ───────────────────────────────────────────────────────────────
   const logout = async () => {
     try {
-      const response = await authApi.logout();
-      console.log(
-        "[logout] API response:",
-        JSON.stringify(response.data, null, 2),
-      );
-    } catch (error: any) {
-      console.log("[logout] API error caught, proceeding with local cleanup:");
-      console.log("  message         :", error.message);
-      console.log("  HTTP status     :", error.response?.status);
-      console.log(
-        "  response body   :",
-        JSON.stringify(error.response?.data, null, 2),
-      );
+      await authApi.logout();
+    } catch {
+      // Local logout must complete even if the server is unavailable.
     } finally {
       // Always clear local state regardless of API success
       await clearSecureStoreAuth();
@@ -375,7 +301,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       setToken(null);
       setUser(null);
       setMustChangePassword(false);
-      console.log("[logout] Local session cleared.");
     }
   };
 

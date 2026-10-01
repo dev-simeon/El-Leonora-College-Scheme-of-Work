@@ -12,7 +12,7 @@ const toErrorMessages = (value: unknown): string[] => {
       .filter(Boolean);
   }
 
-  return value.map((item) => String(item ?? "").trim()).filter(Boolean);
+  return value.flatMap(toErrorMessages).filter(Boolean);
 };
 
 export const getApiErrorMessage = (data: unknown, fallback: string): string => {
@@ -58,7 +58,10 @@ export const getRequestErrorDetails = (
   }
 
   if (requestError?.request) {
-    if (requestError?.code === "ECONNABORTED" || /timeout/i.test(String(requestError?.message ?? ""))) {
+    if (
+      requestError?.code === "ECONNABORTED" ||
+      /timeout/i.test(String(requestError?.message ?? ""))
+    ) {
       return "The request took too long. Please check your connection and try again.";
     }
 

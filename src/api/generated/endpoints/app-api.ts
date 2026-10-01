@@ -22,6 +22,8 @@ import { DUMMY_BASE_URL, assertParamExists, setApiKeyToObject, setBasicAuthToObj
 // @ts-ignore
 import { BASE_PATH, COLLECTION_FORMATS, type RequestArgs, BaseAPI, RequiredError, operationServerMap } from '../base';
 // @ts-ignore
+import type { AppVersionHistoryDtoApiPagedResponse } from '../models';
+// @ts-ignore
 import type { AppVersionResponseDtoApiResponse } from '../models';
 // @ts-ignore
 import type { PublishAppVersionDto } from '../models';
@@ -78,10 +80,14 @@ export const AppApiAxiosParamCreator = function (configuration?: Configuration) 
          * 
          * @param {GetVersionHistoryAppTypeEnum} [appType] 
          * @param {GetVersionHistoryPlatformEnum} [platform] 
+         * @param {string} [version] 
+         * @param {number} [pageNumber] 
+         * @param {number} [pageSize] 
+         * @param {string} [search] 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        getVersionHistory: async (appType?: GetVersionHistoryAppTypeEnum, platform?: GetVersionHistoryPlatformEnum, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+        getVersionHistory: async (appType?: GetVersionHistoryAppTypeEnum, platform?: GetVersionHistoryPlatformEnum, version?: string, pageNumber?: number, pageSize?: number, search?: string, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
             const localVarPath = `/api/v1/App/history`;
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
@@ -99,11 +105,27 @@ export const AppApiAxiosParamCreator = function (configuration?: Configuration) 
             await setBearerAuthToObject(localVarHeaderParameter, configuration)
 
             if (appType !== undefined) {
-                localVarQueryParameter['appType'] = appType;
+                localVarQueryParameter['AppType'] = appType;
             }
 
             if (platform !== undefined) {
-                localVarQueryParameter['platform'] = platform;
+                localVarQueryParameter['Platform'] = platform;
+            }
+
+            if (version !== undefined) {
+                localVarQueryParameter['Version'] = version;
+            }
+
+            if (pageNumber !== undefined) {
+                localVarQueryParameter['PageNumber'] = pageNumber;
+            }
+
+            if (pageSize !== undefined) {
+                localVarQueryParameter['PageSize'] = pageSize;
+            }
+
+            if (search !== undefined) {
+                localVarQueryParameter['Search'] = search;
             }
 
 
@@ -218,11 +240,15 @@ export const AppApiFp = function(configuration?: Configuration) {
          * 
          * @param {GetVersionHistoryAppTypeEnum} [appType] 
          * @param {GetVersionHistoryPlatformEnum} [platform] 
+         * @param {string} [version] 
+         * @param {number} [pageNumber] 
+         * @param {number} [pageSize] 
+         * @param {string} [search] 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        async getVersionHistory(appType?: GetVersionHistoryAppTypeEnum, platform?: GetVersionHistoryPlatformEnum, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<void>> {
-            const localVarAxiosArgs = await localVarAxiosParamCreator.getVersionHistory(appType, platform, options);
+        async getVersionHistory(appType?: GetVersionHistoryAppTypeEnum, platform?: GetVersionHistoryPlatformEnum, version?: string, pageNumber?: number, pageSize?: number, search?: string, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<AppVersionHistoryDtoApiPagedResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.getVersionHistory(appType, platform, version, pageNumber, pageSize, search, options);
             const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
             const localVarOperationServerBasePath = operationServerMap['AppApi.getVersionHistory']?.[localVarOperationServerIndex]?.url;
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
@@ -276,8 +302,8 @@ export const AppApiFactory = function (configuration?: Configuration, basePath?:
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        getVersionHistory(requestParameters: AppApiGetVersionHistoryRequest = {}, options?: RawAxiosRequestConfig): AxiosPromise<void> {
-            return localVarFp.getVersionHistory(requestParameters.appType, requestParameters.platform, options).then((request) => request(axios, basePath));
+        getVersionHistory(requestParameters: AppApiGetVersionHistoryRequest = {}, options?: RawAxiosRequestConfig): AxiosPromise<AppVersionHistoryDtoApiPagedResponse> {
+            return localVarFp.getVersionHistory(requestParameters.appType, requestParameters.platform, requestParameters.version, requestParameters.pageNumber, requestParameters.pageSize, requestParameters.search, options).then((request) => request(axios, basePath));
         },
         /**
          * 
@@ -340,6 +366,34 @@ export interface AppApiGetVersionHistoryRequest {
      * @memberof AppApiGetVersionHistory
      */
     readonly platform?: GetVersionHistoryPlatformEnum
+
+    /**
+     * 
+     * @type {string}
+     * @memberof AppApiGetVersionHistory
+     */
+    readonly version?: string
+
+    /**
+     * 
+     * @type {number}
+     * @memberof AppApiGetVersionHistory
+     */
+    readonly pageNumber?: number
+
+    /**
+     * 
+     * @type {number}
+     * @memberof AppApiGetVersionHistory
+     */
+    readonly pageSize?: number
+
+    /**
+     * 
+     * @type {string}
+     * @memberof AppApiGetVersionHistory
+     */
+    readonly search?: string
 }
 
 /**
@@ -396,7 +450,7 @@ export class AppApi extends BaseAPI {
      * @memberof AppApi
      */
     public getVersionHistory(requestParameters: AppApiGetVersionHistoryRequest = {}, options?: RawAxiosRequestConfig) {
-        return AppApiFp(this.configuration).getVersionHistory(requestParameters.appType, requestParameters.platform, options).then((request) => request(this.axios, this.basePath));
+        return AppApiFp(this.configuration).getVersionHistory(requestParameters.appType, requestParameters.platform, requestParameters.version, requestParameters.pageNumber, requestParameters.pageSize, requestParameters.search, options).then((request) => request(this.axios, this.basePath));
     }
 
     /**

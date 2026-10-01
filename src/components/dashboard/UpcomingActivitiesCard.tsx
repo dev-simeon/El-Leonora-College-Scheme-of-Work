@@ -1,5 +1,5 @@
 import React from "react";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import {
   TermsApi,
@@ -9,6 +9,10 @@ import { AcademicSessionsApi } from "../../api/generated/endpoints/academic-sess
 import { Configuration } from "../../api/generated/configuration";
 import api, { API_BASE_URL } from "../../services/api";
 import { useAuth } from "../../context/AuthContext";
+import {
+  getApiErrorMessage,
+  getRequestErrorMessage,
+} from "../../utils/apiError";
 
 const termsApi = new TermsApi(
   new Configuration({ basePath: API_BASE_URL }),
@@ -34,18 +38,36 @@ export function UpcomingActivitiesCard() {
   const { user, token } = useAuth();
   const canLoad = Boolean(token) && Boolean(user);
 
-  const { data: termId, isLoading: isLoadingTerm } = useQuery({
+  const {
+    data: termId,
+    isLoading: isLoadingTerm,
+    isError: isTermError,
+    error: termError,
+    refetch: refetchTerm,
+  } = useQuery({
     queryKey: ["current-academic-session", user?.id],
     queryFn: async () => {
       const response = await academicSessionsApi.getCurrentAcademicSession();
-      const session = response.data.data;
+      const body = response.data;
+      if (body.success === false) {
+        throw new Error(
+          getApiErrorMessage(body, "Could not load the current school term."),
+        );
+      }
+      const session = body.data;
       return session?.terms?.find((term) => term.isCurrent)?.id;
     },
     enabled: canLoad,
     retry: false,
   });
 
-  const { data: activities = [], isLoading } = useQuery({
+  const {
+    data: activities = [],
+    isLoading,
+    isError: isActivitiesError,
+    error: activitiesError,
+    refetch: refetchActivities,
+  } = useQuery({
     queryKey: ["term-activities", user?.id, termId, "upcoming", 5],
     queryFn: async () => {
       if (!termId) return [];
@@ -54,11 +76,26 @@ export function UpcomingActivitiesCard() {
         filter: GetTermActivitiesFilterEnum.Upcoming,
         pageSize: 5,
       });
-      return response.data.items ?? [];
+      const body = response.data;
+      if (body.success === false) {
+        throw new Error(
+          getApiErrorMessage(body, "Could not load upcoming activities."),
+        );
+      }
+      return body.items ?? [];
     },
     enabled: canLoad && Boolean(termId),
     retry: false,
   });
+  const queryError = isTermError ? termError : activitiesError;
+  const errorMessage = queryError
+    ? getRequestErrorMessage(queryError, "Could not load upcoming activities.")
+    : null;
+
+  const retry = () => {
+    void refetchTerm();
+    if (termId) void refetchActivities();
+  };
 
   return (
     <View style={styles.card}>
@@ -70,8 +107,17 @@ export function UpcomingActivitiesCard() {
         nestedScrollEnabled
         showsVerticalScrollIndicator
       >
-        {isLoadingTerm || isLoading ? (
+        {errorMessage ? (
+          <View style={styles.errorState}>
+            <Text style={styles.state}>{errorMessage}</Text>
+            <Pressable onPress={retry} accessibilityRole="button">
+              <Text style={styles.retry}>Try again</Text>
+            </Pressable>
+          </View>
+        ) : isLoadingTerm || isLoading ? (
           <Text style={styles.state}>Loading upcoming activities…</Text>
+        ) : !termId ? (
+          <Text style={styles.state}>No current school term found.</Text>
         ) : activities.length === 0 ? (
           <Text style={styles.state}>No upcoming activities.</Text>
         ) : (
@@ -126,6 +172,8 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: "#68707E",
   },
+  errorState: { alignItems: "center" },
+  retry: { padding: 8, color: "#0056D2", fontWeight: "700" },
   row: { minHeight: 70, flexDirection: "row", alignItems: "center", gap: 10 },
   dateBox: {
     width: 40,

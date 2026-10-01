@@ -47,13 +47,16 @@ export class ErrorBoundary extends Component<Props, State> {
             </View>
             <Text style={styles.title}>Oops! Something went wrong</Text>
             <Text style={styles.subtitle}>
-              An unexpected error occurred. You can try to reset the app or logout and log back in.
+              An unexpected error occurred. You can try to reset the app or
+              logout and log back in.
             </Text>
-            
+
             <View style={styles.errorBox}>
               <ScrollView style={styles.errorScroll}>
                 <Text style={styles.errorText}>
-                  {this.state.error?.message || "Unknown error"}
+                  {__DEV__
+                    ? this.state.error?.message || "Unknown error"
+                    : "Please try again. If the problem continues, contact support."}
                 </Text>
               </ScrollView>
             </View>
@@ -62,9 +65,14 @@ export class ErrorBoundary extends Component<Props, State> {
               <Pressable style={styles.button} onPress={this.handleReset}>
                 <Text style={styles.buttonText}>Try Again</Text>
               </Pressable>
-              
-              <Pressable style={[styles.button, styles.logoutButton]} onPress={this.handleLogout}>
-                <Text style={[styles.buttonText, styles.logoutButtonText]}>Logout & Reset</Text>
+
+              <Pressable
+                style={[styles.button, styles.logoutButton]}
+                onPress={this.handleLogout}
+              >
+                <Text style={[styles.buttonText, styles.logoutButtonText]}>
+                  Logout & Reset
+                </Text>
               </Pressable>
             </View>
           </View>

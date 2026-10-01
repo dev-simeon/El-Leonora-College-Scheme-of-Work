@@ -25,7 +25,7 @@ export interface AppVersionResponseDto {
      * @type {string}
      * @memberof AppVersionResponseDto
      */
-    'latestVersion'?: string;
+    'version'?: string;
     /**
      * 
      * @type {boolean}
@@ -44,5 +44,17 @@ export interface AppVersionResponseDto {
      * @memberof AppVersionResponseDto
      */
     'releaseNotes'?: string | null;
+    /**
+     * 
+     * @type {number}
+     * @memberof AppVersionResponseDto
+     */
+    'sizeInBytes'?: number;
+    /**
+     * 
+     * @type {string}
+     * @memberof AppVersionResponseDto
+     */
+    'publishedDate'?: string;
 }
 

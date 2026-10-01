@@ -56,6 +56,12 @@ export interface PublishAppVersionDto {
      * @memberof PublishAppVersionDto
      */
     'releaseNotes'?: string | null;
+    /**
+     * 
+     * @type {number}
+     * @memberof PublishAppVersionDto
+     */
+    'sizeInBytes'?: number;
 }
 
 /**

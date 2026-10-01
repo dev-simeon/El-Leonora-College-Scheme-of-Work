@@ -21,7 +21,10 @@ import { AccountApi } from "../../src/api/generated/endpoints/account-api";
 import { ClassesApi } from "../../src/api/generated/endpoints/classes-api";
 import { Configuration } from "../../src/api/generated/configuration";
 import api, { API_BASE_URL } from "../../src/services/api";
-import { getApiErrorMessage, getRequestErrorMessage } from "../../src/utils/apiError";
+import {
+  getApiErrorMessage,
+  getRequestErrorMessage,
+} from "../../src/utils/apiError";
 import { useToast } from "../../src/context/ToastContext";
 
 // ─── API Clients ──────────────────────────────────────────────────────────────
@@ -236,6 +239,8 @@ export default function FeesScreen() {
   const {
     data: profileData,
     isPending: profileLoading,
+    isError: isProfileError,
+    error: profileQueryError,
     refetch: refetchProfile,
     isRefetching,
   } = useQuery({
@@ -261,7 +266,12 @@ export default function FeesScreen() {
     queryKey: ["feeStructure", classId],
     queryFn: async () => {
       const res = await classesApi.getClassFees({ classId: classId! });
-      return (res as any).data?.data ?? null;
+      if (res.data.success === false) {
+        throw new Error(
+          getApiErrorMessage(res.data, "Failed to load fee information"),
+        );
+      }
+      return res.data.data ?? null;
     },
     enabled: !!classId,
   });
@@ -269,10 +279,22 @@ export default function FeesScreen() {
   const isLoading = profileLoading || feesLoading;
 
   useEffect(() => {
+    if (isProfileError && profileQueryError) {
+      showToast({
+        message: getRequestErrorMessage(
+          profileQueryError,
+          "Failed to load your profile and class information.",
+        ),
+        type: "error",
+      });
+    }
+  }, [isProfileError, profileQueryError, showToast]);
+
+  useEffect(() => {
     if (isFeesError && feesQueryError) {
-      showToast({ 
-        message: getRequestErrorMessage(feesQueryError, "Failed to load fees"), 
-        type: "error" 
+      showToast({
+        message: getRequestErrorMessage(feesQueryError, "Failed to load fees"),
+        type: "error",
       });
     }
   }, [isFeesError, feesQueryError, showToast]);
@@ -293,8 +315,8 @@ export default function FeesScreen() {
   const isCleared = totalOwed <= 0;
 
   const onRefresh = () => {
-    refetchProfile();
-    refetchFees();
+    void refetchProfile();
+    if (classId) void refetchFees();
   };
 
   const displayName = profileData
@@ -309,9 +331,7 @@ export default function FeesScreen() {
 
   return (
     <View style={styles.container}>
-      {isFocused && (
-        <StatusBar style="light" />
-      )}
+      {isFocused && <StatusBar style="light" />}
 
       <ScrollView
         showsVerticalScrollIndicator={false}

@@ -22,6 +22,8 @@ import { DUMMY_BASE_URL, assertParamExists, setApiKeyToObject, setBasicAuthToObj
 // @ts-ignore
 import { BASE_PATH, COLLECTION_FORMATS, type RequestArgs, BaseAPI, RequiredError, operationServerMap } from '../base';
 // @ts-ignore
+import type { ClassroomAttendanceStudentResponseApiPagedResponse } from '../models';
+// @ts-ignore
 import type { RecordStudentAttendanceRequest } from '../models';
 // @ts-ignore
 import type { StudentStatusResponseApiResponse } from '../models';
@@ -33,15 +35,80 @@ export const AttendanceApiAxiosParamCreator = function (configuration?: Configur
     return {
         /**
          * 
-         * @param {string} studentId 
+         * @param {string} [classId] 
+         * @param {GetClassroomAttendanceStatusEnum} [status] 
+         * @param {string} [fromDate] 
+         * @param {number} [pageNumber] 
+         * @param {number} [pageSize] 
+         * @param {string} [search] 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        getStudentStatus: async (studentId: string, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
-            // verify required parameter 'studentId' is not null or undefined
-            assertParamExists('getStudentStatus', 'studentId', studentId)
-            const localVarPath = `/api/Attendance/students/{studentId}/status`
-                .replace(`{${"studentId"}}`, encodeURIComponent(String(studentId)));
+        getClassroomAttendance: async (classId?: string, status?: GetClassroomAttendanceStatusEnum, fromDate?: string, pageNumber?: number, pageSize?: number, search?: string, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            const localVarPath = `/api/Attendance/students`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+            if (classId !== undefined) {
+                localVarQueryParameter['ClassId'] = classId;
+            }
+
+            if (status !== undefined) {
+                localVarQueryParameter['Status'] = status;
+            }
+
+            if (fromDate !== undefined) {
+                localVarQueryParameter['FromDate'] = (fromDate as any instanceof Date) ?
+                    (fromDate as any).toISOString().substring(0,10) :
+                    fromDate;
+            }
+
+            if (pageNumber !== undefined) {
+                localVarQueryParameter['PageNumber'] = pageNumber;
+            }
+
+            if (pageSize !== undefined) {
+                localVarQueryParameter['PageSize'] = pageSize;
+            }
+
+            if (search !== undefined) {
+                localVarQueryParameter['Search'] = search;
+            }
+
+
+    
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @param {string} studentAdmissionNo 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        getStudentStatus: async (studentAdmissionNo: string, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'studentAdmissionNo' is not null or undefined
+            assertParamExists('getStudentStatus', 'studentAdmissionNo', studentAdmissionNo)
+            const localVarPath = `/api/Attendance/students/{studentAdmissionNo}/status`
+                .replace(`{${"studentAdmissionNo"}}`, encodeURIComponent(String(studentAdmissionNo)));
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
             let baseOptions;
@@ -117,12 +184,29 @@ export const AttendanceApiFp = function(configuration?: Configuration) {
     return {
         /**
          * 
-         * @param {string} studentId 
+         * @param {string} [classId] 
+         * @param {GetClassroomAttendanceStatusEnum} [status] 
+         * @param {string} [fromDate] 
+         * @param {number} [pageNumber] 
+         * @param {number} [pageSize] 
+         * @param {string} [search] 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        async getStudentStatus(studentId: string, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<StudentStatusResponseApiResponse>> {
-            const localVarAxiosArgs = await localVarAxiosParamCreator.getStudentStatus(studentId, options);
+        async getClassroomAttendance(classId?: string, status?: GetClassroomAttendanceStatusEnum, fromDate?: string, pageNumber?: number, pageSize?: number, search?: string, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<ClassroomAttendanceStudentResponseApiPagedResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.getClassroomAttendance(classId, status, fromDate, pageNumber, pageSize, search, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['AttendanceApi.getClassroomAttendance']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
+         * @param {string} studentAdmissionNo 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async getStudentStatus(studentAdmissionNo: string, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<StudentStatusResponseApiResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.getStudentStatus(studentAdmissionNo, options);
             const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
             const localVarOperationServerBasePath = operationServerMap['AttendanceApi.getStudentStatus']?.[localVarOperationServerIndex]?.url;
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
@@ -151,12 +235,21 @@ export const AttendanceApiFactory = function (configuration?: Configuration, bas
     return {
         /**
          * 
+         * @param {AttendanceApiGetClassroomAttendanceRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        getClassroomAttendance(requestParameters: AttendanceApiGetClassroomAttendanceRequest = {}, options?: RawAxiosRequestConfig): AxiosPromise<ClassroomAttendanceStudentResponseApiPagedResponse> {
+            return localVarFp.getClassroomAttendance(requestParameters.classId, requestParameters.status, requestParameters.fromDate, requestParameters.pageNumber, requestParameters.pageSize, requestParameters.search, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
          * @param {AttendanceApiGetStudentStatusRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
         getStudentStatus(requestParameters: AttendanceApiGetStudentStatusRequest, options?: RawAxiosRequestConfig): AxiosPromise<StudentStatusResponseApiResponse> {
-            return localVarFp.getStudentStatus(requestParameters.studentId, options).then((request) => request(axios, basePath));
+            return localVarFp.getStudentStatus(requestParameters.studentAdmissionNo, options).then((request) => request(axios, basePath));
         },
         /**
          * 
@@ -171,6 +264,55 @@ export const AttendanceApiFactory = function (configuration?: Configuration, bas
 };
 
 /**
+ * Request parameters for getClassroomAttendance operation in AttendanceApi.
+ * @export
+ * @interface AttendanceApiGetClassroomAttendanceRequest
+ */
+export interface AttendanceApiGetClassroomAttendanceRequest {
+    /**
+     * 
+     * @type {string}
+     * @memberof AttendanceApiGetClassroomAttendance
+     */
+    readonly classId?: string
+
+    /**
+     * 
+     * @type {'Present' | 'Absent' | 'Late' | 'Excused'}
+     * @memberof AttendanceApiGetClassroomAttendance
+     */
+    readonly status?: GetClassroomAttendanceStatusEnum
+
+    /**
+     * 
+     * @type {string}
+     * @memberof AttendanceApiGetClassroomAttendance
+     */
+    readonly fromDate?: string
+
+    /**
+     * 
+     * @type {number}
+     * @memberof AttendanceApiGetClassroomAttendance
+     */
+    readonly pageNumber?: number
+
+    /**
+     * 
+     * @type {number}
+     * @memberof AttendanceApiGetClassroomAttendance
+     */
+    readonly pageSize?: number
+
+    /**
+     * 
+     * @type {string}
+     * @memberof AttendanceApiGetClassroomAttendance
+     */
+    readonly search?: string
+}
+
+/**
  * Request parameters for getStudentStatus operation in AttendanceApi.
  * @export
  * @interface AttendanceApiGetStudentStatusRequest
@@ -181,7 +323,7 @@ export interface AttendanceApiGetStudentStatusRequest {
      * @type {string}
      * @memberof AttendanceApiGetStudentStatus
      */
-    readonly studentId: string
+    readonly studentAdmissionNo: string
 }
 
 /**
@@ -207,13 +349,24 @@ export interface AttendanceApiRecordStudentAttendanceRequest {
 export class AttendanceApi extends BaseAPI {
     /**
      * 
+     * @param {AttendanceApiGetClassroomAttendanceRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof AttendanceApi
+     */
+    public getClassroomAttendance(requestParameters: AttendanceApiGetClassroomAttendanceRequest = {}, options?: RawAxiosRequestConfig) {
+        return AttendanceApiFp(this.configuration).getClassroomAttendance(requestParameters.classId, requestParameters.status, requestParameters.fromDate, requestParameters.pageNumber, requestParameters.pageSize, requestParameters.search, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
      * @param {AttendanceApiGetStudentStatusRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      * @memberof AttendanceApi
      */
     public getStudentStatus(requestParameters: AttendanceApiGetStudentStatusRequest, options?: RawAxiosRequestConfig) {
-        return AttendanceApiFp(this.configuration).getStudentStatus(requestParameters.studentId, options).then((request) => request(this.axios, this.basePath));
+        return AttendanceApiFp(this.configuration).getStudentStatus(requestParameters.studentAdmissionNo, options).then((request) => request(this.axios, this.basePath));
     }
 
     /**
@@ -228,3 +381,13 @@ export class AttendanceApi extends BaseAPI {
     }
 }
 
+/**
+  * @export
+  * @enum {string}
+  */
+export enum GetClassroomAttendanceStatusEnum {
+    Present = 'Present',
+    Absent = 'Absent',
+    Late = 'Late',
+    Excused = 'Excused'
+}

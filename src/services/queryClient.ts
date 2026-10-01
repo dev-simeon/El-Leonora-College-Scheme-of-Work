@@ -27,7 +27,11 @@ export const queryClient = new QueryClient({
     queries: {
       staleTime: Infinity,
       gcTime: Infinity,
-      retry: 2,
+      retry: (failureCount, error: any) => {
+        const status = error?.response?.status;
+        if (status >= 400 && status < 500) return false;
+        return failureCount < 2;
+      },
     },
   },
 });

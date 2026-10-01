@@ -31,8 +31,12 @@ import { StaffsApi } from "../../src/api/generated/endpoints/staffs-api";
 import { RecordStudentAttendanceRequestStatusEnum } from "../../src/api/generated/models/record-student-attendance-request";
 import { Configuration } from "../../src/api/generated/configuration";
 import api, { API_BASE_URL } from "../../src/services/api";
-import { getRequestErrorMessage } from "../../src/utils/apiError";
+import {
+  getApiErrorMessage,
+  getRequestErrorMessage,
+} from "../../src/utils/apiError";
 import { useToast } from "../../src/context/ToastContext";
+import { decodeJwt } from "../../src/utils/jwt";
 
 type Person = {
   id: string;
@@ -41,7 +45,7 @@ type Person = {
   admissionNumber?: string;
   isInSchool?: boolean;
 };
-type ClassOption = { id: string; label: string };
+type ClassOption = { id: string; label: string; itemKey: string };
 type CheckoutOption = "day" | "reason";
 type SuccessAction = Exclude<AttendanceAction, "check_out_required">;
 const STAFF: Person[] = [
@@ -129,35 +133,147 @@ const nameOf = (student: any) =>
   [student?.firstName, student?.middleName, student?.lastName]
     .filter(Boolean)
     .join(" ") || "Student";
+const stripArmSuffix = (value: string) => {
+  if (!value) return "";
+
+  const trimmed = value.trim();
+  const armPatterns = [
+    /\s*[-–/]\s*[A-D]\s*$/i,
+    /\s*[-–/]\s*ART\s*$/i,
+    /\s*[-–/]\s*ARTS\s*$/i,
+    /\s*[-–/]\s*SCI\s*$/i,
+    /\s*[-–/]\s*SCIENCE\s*$/i,
+    /\s*[-–/]\s*COM\s*$/i,
+    /\s*[-–/]\s*COMM\s*$/i,
+    /\s*[-–/]\s*COMMERCIAL\s*$/i,
+  ];
+
+  let cleaned = trimmed;
+  for (const pattern of armPatterns) {
+    cleaned = cleaned.replace(pattern, "").trim();
+  }
+
+  return cleaned;
+};
+
+const getClassSortPriority = (label: string) => {
+  const normalized = label.trim().toUpperCase();
+
+  if (/^JSS\s*\d+/i.test(normalized)) {
+    const match = normalized.match(/JSS\s*(\d+)/i);
+    return 100 + Number(match?.[1] ?? 0);
+  }
+
+  if (/^SS\s*\d+/i.test(normalized)) {
+    const match = normalized.match(/SS\s*(\d+)/i);
+    return 200 + Number(match?.[1] ?? 0);
+  }
+
+  if (/^NUR\s*\d+/i.test(normalized)) {
+    const match = normalized.match(/NUR\s*(\d+)/i);
+    return 300 + Number(match?.[1] ?? 0);
+  }
+
+  if (/^PRY\s*\d+/i.test(normalized)) {
+    const match = normalized.match(/PRY\s*(\d+)/i);
+    return 400 + Number(match?.[1] ?? 0);
+  }
+
+  return 999;
+};
+
 const classLabelOf = (schoolClass: any) => {
-  const level =
-    schoolClass?.classCode ||
-    schoolClass?.classLevel ||
-    schoolClass?.code ||
-    schoolClass?.level ||
+  const rawLevel =
+    schoolClass?.classCode ??
+    schoolClass?.classLevel ??
+    schoolClass?.code ??
+    schoolClass?.level ??
     "Class";
-  const department = schoolClass?.department?.trim();
-  return department && !level.toLowerCase().includes(department.toLowerCase())
-    ? `${level} — ${department}`
-    : level;
+
+  const level = stripArmSuffix(String(rawLevel).trim()) || "Class";
+  const department = String(schoolClass?.department ?? "").trim();
+  const normalizedDepartment = department.replace(/[-_]/g, " ").trim();
+
+  if (!normalizedDepartment) return level;
+
+  return `${level} ${normalizedDepartment}`;
 };
 const parseStudentQr = (data: string) => {
   const value = data.trim();
   try {
-    const parsed = JSON.parse(value);
+    const parsed = JSON.parse(value) as any;
+    if (typeof parsed === "string" || typeof parsed === "number") {
+      const admissionNumber = String(parsed).trim();
+      return { admissionNumber: admissionNumber || undefined };
+    }
+    if (!parsed || typeof parsed !== "object") {
+      return { admissionNumber: value || undefined };
+    }
+
+    const admissionNumber = String(
+      parsed.studentAdmissionNo ??
+        parsed.admissionNumber ??
+        parsed.admissionNo ??
+        parsed.studentNo ??
+        "",
+    ).trim();
     return {
-      id: String(parsed.studentId ?? parsed.id ?? "").trim(),
       name: parsed.studentName ?? parsed.name,
+      admissionNumber: admissionNumber || undefined,
     };
   } catch {
-    return { id: value, name: undefined };
+    return { name: undefined, admissionNumber: value || undefined };
   }
+};
+
+const getAssignedClassFromToken = (token: string | null | undefined) => {
+  const claims = token ? decodeJwt(token) as Record<string, unknown> | null : null;
+  if (!claims) return null;
+
+  const normalizeKey = (key: string) => key.toLowerCase().replace(/[^a-z0-9]/g, "");
+  const claim = (names: string[]) => {
+    const normalizedNames = names.map(normalizeKey);
+    const entry = Object.entries(claims).find(([key]) => {
+      const normalizedKey = normalizeKey(key);
+      return normalizedNames.some(
+        (name) => normalizedKey === name || normalizedKey.endsWith(name),
+      );
+    });
+    return entry?.[1];
+  };
+  const asId = (value: unknown): string | null => {
+    if (typeof value === "string" || typeof value === "number") {
+      const id = String(value).trim();
+      return id || null;
+    }
+    return null;
+  };
+
+  let assigned = claim(["assignedClass", "classInfo", "homeroomClass"]);
+  if (Array.isArray(assigned)) assigned = assigned[0];
+  const nested = assigned && typeof assigned === "object"
+    ? assigned as Record<string, unknown>
+    : null;
+  const nestedEntries = nested ? Object.entries(nested) : [];
+  const nestedValue = (names: string[]) => {
+    const normalizedNames = names.map(normalizeKey);
+    return nestedEntries.find(([key]) => normalizedNames.includes(normalizeKey(key)))?.[1];
+  };
+
+  const id = asId(claim(["assignedClassId", "classId", "homeroomClassId"]))
+    ?? asId(nestedValue(["classId", "id", "assignedClassId"]));
+  if (!id) return null;
+
+  const label = asId(claim(["className", "classCode", "assignedClassName"]))
+    ?? asId(nestedValue(["className", "classCode", "code", "name", "level"]))
+    ?? "Assigned Class";
+  return { id, label };
 };
 
 export default function AttendanceScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   const { showToast } = useToast();
   const [permission, requestPermission] = useCameraPermissions();
   const [activeTab, setActiveTab] = useState<"Students" | "Staff">("Students");
@@ -200,25 +316,69 @@ export default function AttendanceScreen() {
   const [presentIds, setPresentIds] = useState<string[]>([]);
   const [hasClassAssignment, setHasClassAssignment] = useState(false);
   const [assignmentLoading, setAssignmentLoading] = useState(true);
+  const [gateCheckIns, setGateCheckIns] = useState<Person[]>([]);
+  const [gateCheckInsLoading, setGateCheckInsLoading] = useState(false);
   const [actionsOpen, setActionsOpen] = useState(false);
   const actionsProgress = useRef(new Animated.Value(0)).current;
   const scanLock = useRef(false);
   const isWeb = Platform.OS === "web";
   const isAdmin = user?.backendRole?.toLowerCase().includes("admin") ?? false;
-  const normalList = activeTab === "Students" ? CHECK_IN_STUDENTS : STAFF;
+  const isTeacher = user?.backendRole
+    ?.split(/[,;|]/)
+    .some((role) => role.trim().toLowerCase() === "teacher") ?? false;
+  const assignedClass = getAssignedClassFromToken(token);
+  const normalList = activeTab === "Students" ? gateCheckIns : STAFF;
   const selectedClass = classes.find((item) => item.id === selectedClassId);
   const summary =
-    activeTab === "Students" ? `${CHECK_IN_STUDENTS.length}/42` : "2/12";
+    activeTab === "Students"
+      ? `${gateCheckIns.filter((student) => student.isInSchool).length}/${gateCheckIns.length}`
+      : "2/12";
 
   useEffect(() => {
-    if (user?.role === "student") router.replace("/(main)/home");
-  }, [router, user?.role]);
+    if (user && user.role === "student") router.replace("/(main)/home");
+    else if (user && !isAdmin && !isTeacher) router.replace("/(main)/home");
+  }, [router, user, isAdmin, isTeacher]);
   useEffect(() => {
-    if (user?.id) void loadAllowedClasses();
-  }, [user?.id]);
+    if (!user || (!isAdmin && !isTeacher)) {
+      setAssignmentLoading(false);
+      setHasClassAssignment(false);
+      setClasses([]);
+      setGateCheckIns([]);
+      return;
+    }
+
+    if (isAdmin) {
+      setHasClassAssignment(true);
+      setAssignmentLoading(false);
+      void loadAllowedClasses();
+      void loadGateCheckIns();
+      return;
+    }
+
+    if (assignedClass) {
+      const assignedOption: ClassOption = {
+        id: assignedClass.id,
+        label: assignedClass.label,
+        itemKey: assignedClass.id,
+      };
+      setClasses([assignedOption]);
+      setSelectedClassId(assignedOption.id);
+      setHasClassAssignment(true);
+      setAssignmentLoading(false);
+      return;
+    }
+
+    // No class claim means this teacher may scan, but must not request gate lists.
+    setClasses([]);
+    setSelectedClassId(null);
+    setHasClassAssignment(false);
+    setAssignmentLoading(false);
+    setGateCheckIns([]);
+    setGateCheckInsLoading(false);
+  }, [user?.id, user?.backendRole, token, isAdmin, isTeacher, assignedClass?.id]);
   useEffect(() => {
-    if (selectedClassId) void loadClassStudents(selectedClassId);
-  }, [selectedClassId]);
+    if (manualMode && selectedClassId) void loadClassStudents(selectedClassId);
+  }, [selectedClassId, manualMode]);
   if (!user || user.role === "student") return null;
 
   const resetCheckout = () => {
@@ -238,28 +398,57 @@ export default function AttendanceScreen() {
   const openScanner = async () => {
     scanLock.current = false;
 
-    if (isWeb) {
+    if (isWeb && typeof window !== "undefined" && !window.isSecureContext) {
       showToast({
         message:
-          "Camera scanning is not available in the browser. Please use the mobile app for QR scanning.",
-        type: "info",
+          "Browser camera access requires HTTPS or localhost. Open this app using a secure connection and try again.",
+        type: "error",
       });
       return;
     }
 
-    if (!permission) return;
-    if (!permission.granted && !(await requestPermission()).granted) return;
-    setScannerOpen(true);
+    try {
+      const cameraPermission = permission?.granted
+        ? permission
+        : await requestPermission();
+      if (!cameraPermission.granted) {
+        showToast({
+          message:
+            "Camera access was not allowed. Enable camera permission in your browser and try again.",
+          type: "info",
+        });
+        return;
+      }
+      setScannerOpen(true);
+    } catch (error) {
+      showToast({
+        message: getRequestErrorMessage(
+          error,
+          "Could not request camera access from the browser.",
+        ),
+        type: "error",
+      });
+    }
   };
   const scan = async ({ data }: { data: string }) => {
     const qr = parseStudentQr(data);
-    if (!qr.id || scanLock.current) return;
+    const studentAdmissionNo = qr.admissionNumber?.trim();
+    if (!studentAdmissionNo || scanLock.current) {
+      if (!studentAdmissionNo) {
+        showToast({
+          message: "This QR code does not contain a student admission number.",
+          type: "error",
+        });
+      }
+      return;
+    }
     scanLock.current = true;
-    setUserId(qr.id);
+    setUserId(studentAdmissionNo);
     setLoading(true);
+    let operation = "check student attendance status";
     try {
       if (activeTab === "Staff") {
-        const response = await AttendanceService.scanAttendance(qr.id);
+        const response = await AttendanceService.scanAttendance(studentAdmissionNo);
         setScannerOpen(false);
         if (response.action === "check_out_required") {
           resetCheckout();
@@ -268,46 +457,110 @@ export default function AttendanceScreen() {
           setSuccess({
             action: "check_in",
             timestamp:
-              AttendanceService.getLatestLog(qr.id)?.timestamp ?? new Date(),
+              AttendanceService.getLatestLog(studentAdmissionNo)?.timestamp ?? new Date(),
           });
         return;
       }
-      const statusResponse = await attendanceApi.getStudentStatus({
-        studentId: qr.id,
+      const statusRequest = { studentAdmissionNo };
+      const statusPath = `/api/Attendance/students/${encodeURIComponent(studentAdmissionNo)}/status`;
+      console.log("[Attendance Status API] Request", {
+        method: "GET",
+        baseUrl: API_BASE_URL,
+        path: statusPath,
+        pathParameter: { studentAdmissionNo },
       });
+      const statusResponse = await attendanceApi.getStudentStatus(statusRequest);
+      console.log("[Attendance Status API] Response", {
+        httpStatus: statusResponse.status,
+        data: statusResponse.data,
+      });
+      if (statusResponse.data.success !== true || !statusResponse.data.data) {
+        const apiError = new Error(
+          getApiErrorMessage(
+            statusResponse.data,
+            "Could not check this student's attendance status.",
+          ),
+        ) as Error & { apiResponse?: unknown };
+        apiError.apiResponse = statusResponse.data;
+        throw apiError;
+      }
       const status = statusResponse.data.data as any;
       const isCurrentlyInSchool =
-        status?.isCurrentlyInSchool ?? status?.isPresent ?? false;
+        status?.isCurrentlyInSchool ??
+        status?.isPresent ??
+        (typeof status?.isOutsideSchool === "boolean"
+          ? !status.isOutsideSchool
+          : !status?.activeMovement);
       const knownStudent = CHECK_IN_STUDENTS.find(
-        (student) => student.id === qr.id || student.admissionNumber === qr.id,
+        (student) => student.admissionNumber === studentAdmissionNo,
       );
       const studentName =
         status?.studentName ??
         status?.name ??
         qr.name ??
         knownStudent?.name ??
-        `Student ${qr.id}`;
-      setScannedStudent({ id: qr.id, name: studentName });
+        `Student ${studentAdmissionNo}`;
+      setScannedStudent({ id: studentAdmissionNo, name: studentName });
       setScannerOpen(false);
       if (isCurrentlyInSchool) {
         resetCheckout();
         setOption("reason");
         setCheckoutOpen(true);
       } else {
-        await attendanceApi.recordStudentAttendance({
+        operation = "record student attendance";
+        const recordRequest = {
           recordStudentAttendanceRequest: {
-            studentId: qr.id,
+            studentAdmissionNo,
             status: RecordStudentAttendanceRequestStatusEnum.Present,
           },
+        };
+        console.log("[Attendance Record API] Request", {
+          method: "POST",
+          baseUrl: API_BASE_URL,
+          path: "/api/Attendance/students",
+          body: recordRequest.recordStudentAttendanceRequest,
         });
-        setSuccess({ action: "check_in", timestamp: new Date() });
+        const recordResponse = await attendanceApi.recordStudentAttendance(recordRequest);
+        console.log("[Attendance Record API] Response", {
+          httpStatus: recordResponse.status,
+          data: recordResponse.data,
+        });
+        if (recordResponse.data.success !== true || !recordResponse.data.data) {
+          const apiError = new Error(
+            getApiErrorMessage(
+              recordResponse.data,
+              "Could not record this student's attendance.",
+            ),
+          ) as Error & { apiResponse?: unknown };
+          apiError.apiResponse = recordResponse.data;
+          throw apiError;
+        }
+        if (isAdmin) void loadGateCheckIns();
+        const recordedAt = recordResponse.data.data.lastAttendanceAt;
+        setSuccess({
+          action: "check_in",
+          timestamp: recordedAt ? new Date(recordedAt) : new Date(),
+        });
       }
     } catch (error) {
+      const fallback =
+        operation === "record student attendance"
+          ? "Could not record this student's attendance."
+          : "Could not check this student's attendance status.";
+      const requestError = error as any;
+      const message = getRequestErrorMessage(requestError, fallback);
+      const responseData =
+        requestError?.response?.data ?? requestError?.apiResponse;
+      console.warn("[Attendance] Request failed", {
+        operation,
+        status: requestError?.response?.status,
+        code: requestError?.code ?? responseData?.code ?? responseData?.Code,
+        message,
+        apiErrors: responseData?.errors ?? responseData?.Errors,
+        response: responseData,
+      });
       showToast({
-        message: getRequestErrorMessage(
-          error,
-          "Could not check this student's attendance status.",
-        ),
+        message,
         type: "error",
       });
     } finally {
@@ -331,6 +584,14 @@ export default function AttendanceScreen() {
         timestamp:
           AttendanceService.getLatestLog(userId)?.timestamp ?? new Date(),
         reason: selectedReason ?? undefined,
+      });
+    } catch (error) {
+      showToast({
+        message: getRequestErrorMessage(
+          error,
+          "Could not record the student's checkout.",
+        ),
+        type: "error",
       });
     } finally {
       setLoading(false);
@@ -412,18 +673,104 @@ export default function AttendanceScreen() {
     closeActions();
     setManualMode(true);
   };
+  const loadGateCheckIns = async () => {
+    if (!isAdmin) {
+      setGateCheckIns([]);
+      setGateCheckInsLoading(false);
+      return;
+    }
+
+    setGateCheckInsLoading(true);
+    try {
+      const now = new Date();
+      // The API contract is a calendar date (yyyy-MM-dd), not a UTC timestamp.
+      // toISOString() would shift local midnight into the previous UTC day in Lagos.
+      const fromDate = [
+        now.getFullYear(),
+        String(now.getMonth() + 1).padStart(2, "0"),
+        String(now.getDate()).padStart(2, "0"),
+      ].join("-");
+      const pageSize = 100;
+      const firstPage = await attendanceApi.getClassroomAttendance({
+        fromDate,
+        pageNumber: 1,
+        pageSize,
+      });
+      if (firstPage.data.success === false) {
+        throw new Error(
+          getApiErrorMessage(firstPage.data, "Could not load today's gate check-ins."),
+        );
+      }
+
+      const totalPages = Math.max(1, firstPage.data.pagination?.totalPages ?? 1);
+      const laterPages = await Promise.all(
+        Array.from({ length: totalPages - 1 }, (_, index) =>
+          attendanceApi.getClassroomAttendance({
+            fromDate,
+            pageNumber: index + 2,
+            pageSize,
+          }),
+        ),
+      );
+      const records = [firstPage, ...laterPages].flatMap(
+        (response) => response.data.items ?? [],
+      );
+      setGateCheckIns(
+        records
+          .map((record: any) => ({
+            id: String(record.studentId ?? "").trim(),
+            name: String(record.fullName ?? record.studentName ?? "Student"),
+            admissionNumber:
+              record.studentAdmissionNo ??
+              record.admissionNumber ??
+              record.admissionNo ??
+              record.studentNumber ??
+              "—",
+            className: record.className ?? record.classCode,
+            isInSchool:
+              typeof record.isInSchool === "boolean"
+                ? record.isInSchool
+                : undefined,
+          }))
+          .filter((student) => student.id),
+      );
+    } catch (error) {
+      setGateCheckIns([]);
+      showToast({
+        message: getRequestErrorMessage(
+          error,
+          "Could not load today's gate check-ins.",
+        ),
+        type: "error",
+      });
+    } finally {
+      setGateCheckInsLoading(false);
+    }
+  };
   const loadAllowedClasses = async () => {
     setClassLoading(true);
-    setAssignmentLoading(true);
     try {
       const response = await classesApi.getClasses();
       const all = response.data.data ?? [];
       let allowed = all
-        .map((item: any) => ({
-          id: item.classId ?? "",
-          label: classLabelOf(item),
-        }))
-        .filter((item) => item.id);
+        .map((item: any) => {
+          const id = String(item?.classId ?? item?.id ?? "").trim();
+          const label = classLabelOf(item);
+          if (!id || !label) return null;
+          return {
+            id,
+            label,
+            itemKey: `${id}_${String(item?.department ?? "").trim()}`,
+          } as ClassOption;
+        })
+        .filter(Boolean) as ClassOption[];
+
+      allowed = allowed.sort((a, b) => {
+        const priorityDiff =
+          getClassSortPriority(a.label) - getClassSortPriority(b.label);
+        if (priorityDiff !== 0) return priorityDiff;
+        return a.label.localeCompare(b.label);
+      });
       if (!isAdmin) {
         const details = await Promise.all(
           allowed.map(async (item) => ({
@@ -462,7 +809,6 @@ export default function AttendanceScreen() {
       });
     } finally {
       setClassLoading(false);
-      setAssignmentLoading(false);
     }
   };
   const loadClassStudents = async (classId: string) => {
@@ -509,6 +855,14 @@ export default function AttendanceScreen() {
         message: `Attendance saved for ${presentIds.length} student${presentIds.length === 1 ? "" : "s"}.`,
         type: "success",
       });
+    } catch (error) {
+      showToast({
+        message: getRequestErrorMessage(
+          error,
+          "Could not save attendance. Please try again.",
+        ),
+        type: "error",
+      });
     } finally {
       setLoading(false);
     }
@@ -548,7 +902,7 @@ export default function AttendanceScreen() {
         onSave={saveManual}
       />
     );
-  if (assignmentLoading || !hasClassAssignment)
+  if (assignmentLoading || !hasClassAssignment || !isAdmin)
     return (
       <ScanOnlyView
         insets={insets}
@@ -563,9 +917,15 @@ export default function AttendanceScreen() {
         otherReason={otherReason}
         reasonMenuOpen={reasonMenuOpen}
         canSubmit={canSubmit}
+        showManualAction={isTeacher && hasClassAssignment}
+        onManual={enterManual}
         onScan={openScanner}
         onCloseScanner={() => !loading && setScannerOpen(false)}
         onBarcode={scan}
+        onCameraMountError={(message: string) => {
+          setScannerOpen(false);
+          showToast({ message, type: "error" });
+        }}
         onCloseCheckout={() => !loading && setCheckoutOpen(false)}
         onOption={setOption}
         onReason={setReason}
@@ -628,8 +988,21 @@ export default function AttendanceScreen() {
                 style={styles.summaryIcon}
               />
             </TouchableOpacity>
-            <Text style={styles.listTitle}>Check-In List</Text>
+            <Text style={styles.listTitle}>
+              {activeTab === "Students" ? "Gate Check-Ins" : "Staff Check-Ins"}
+            </Text>
           </>
+        }
+        ListEmptyComponent={
+          activeTab === "Students" ? (
+            gateCheckInsLoading ? (
+              <ActivityIndicator color={COLORS.primary} style={styles.loader} />
+            ) : (
+              <Text style={styles.noStudents}>
+                No gate check-ins recorded today.
+              </Text>
+            )
+          ) : null
         }
         renderItem={({ item }) => <PersonCard person={item} />}
       />
@@ -678,6 +1051,10 @@ export default function AttendanceScreen() {
         insetTop={insets.top}
         onClose={() => !loading && setScannerOpen(false)}
         onScan={scan}
+        onMountError={(message: string) => {
+          setScannerOpen(false);
+          showToast({ message, type: "error" });
+        }}
       />
       <CheckoutModal
         visible={checkoutOpen}
@@ -770,7 +1147,7 @@ function ManualMarkingView({
                   <View style={styles.classMenu}>
                     {classes.map((item: ClassOption) => (
                       <TouchableOpacity
-                        key={item.id}
+                        key={item.itemKey}
                         style={styles.classMenuItem}
                         onPress={() => onSelectClass(item.id)}
                       >
@@ -858,9 +1235,12 @@ function ScanOnlyView({
   otherReason,
   reasonMenuOpen,
   canSubmit,
+  showManualAction,
+  onManual,
   onScan,
   onCloseScanner,
   onBarcode,
+  onCameraMountError,
   onCloseCheckout,
   onOption,
   onReason,
@@ -910,6 +1290,19 @@ function ScanOnlyView({
               <Ionicons name="qr-code-outline" size={22} color="#FFF" />
               <Text style={styles.doneButtonText}>Scan QR Code</Text>
             </TouchableOpacity>
+            {showManualAction && (
+              <TouchableOpacity
+                style={styles.manualOnlyButton}
+                onPress={onManual}
+              >
+                <Ionicons
+                  name="checkbox-outline"
+                  size={22}
+                  color={COLORS.primary}
+                />
+                <Text style={styles.manualOnlyButtonText}>Mark Attendance</Text>
+              </TouchableOpacity>
+            )}
           </>
         )}
       </View>
@@ -919,6 +1312,7 @@ function ScanOnlyView({
         insetTop={insets.top}
         onClose={onCloseScanner}
         onScan={onBarcode}
+        onMountError={onCameraMountError}
       />
       <CheckoutModal
         visible={checkoutOpen}
@@ -1002,11 +1396,14 @@ function DialAction({ icon, label, progress, offset, onPress }: any) {
     </Animated.View>
   );
 }
-function ScannerModal({ visible, loading, insetTop, onClose, onScan }: any) {
-  if (Platform.OS === "web") {
-    return null;
-  }
-
+function ScannerModal({
+  visible,
+  loading,
+  insetTop,
+  onClose,
+  onScan,
+  onMountError,
+}: any) {
   return (
     <Modal
       visible={visible}
@@ -1020,6 +1417,12 @@ function ScannerModal({ visible, loading, insetTop, onClose, onScan }: any) {
           facing="back"
           onBarcodeScanned={loading ? undefined : onScan}
           barcodeScannerSettings={{ barcodeTypes: ["qr"] }}
+          onMountError={(event) =>
+            onMountError(
+              event.message ||
+                "Could not start the camera. Check browser permissions and try again.",
+            )
+          }
         />
         <View style={styles.cameraShade}>
           <View style={styles.viewfinder} />
@@ -1449,6 +1852,25 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: 10,
+  },
+  manualOnlyButton: {
+    marginTop: 12,
+    minHeight: 54,
+    width: "100%",
+    borderRadius: 13,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: COLORS.primary,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+  },
+  manualOnlyButtonText: {
+    color: COLORS.primary,
+    fontSize: 15,
+    fontWeight: "700",
+    fontFamily: "Lexend",
   },
   listContent: { paddingHorizontal: 20, paddingTop: 10 },
   summaryCard: {

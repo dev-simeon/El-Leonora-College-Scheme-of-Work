@@ -17,6 +17,10 @@ module.exports = {
   expo: {
     name: 'Elleonora student companion',
     slug: 'el-leonora-college-scheme-of-work',
+    web: {
+      output: 'static',
+      favicon: './public/icons/icon-192.png',
+    },
 
     // ── Version ──────────────────────────────────────────────────────────────
     // Driven by src/constants/version.json — single source of truth

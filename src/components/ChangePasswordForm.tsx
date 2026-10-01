@@ -181,10 +181,6 @@ export default function ChangePasswordForm({
       });
 
       const body = response.data;
-      console.log(
-        "[changePassword] API response:",
-        JSON.stringify(body, null, 2),
-      );
 
       // The server wraps the result in ApiResponse — treat success:false as an error
       if (body.success === false) {
@@ -207,14 +203,6 @@ export default function ChangePasswordForm({
         router.back();
       }
     } catch (error: any) {
-      console.log("[changePassword] ERROR caught");
-      console.log("  message         :", error.message);
-      console.log(
-        "  response body   :",
-        JSON.stringify(error.response?.data, null, 2),
-      );
-      console.log("  full error      :", JSON.stringify(error, null, 2));
-
       setErrorMsg(
         getRequestErrorMessage(
           error,
@@ -453,15 +441,8 @@ export default function ChangePasswordForm({
                   onPress={async () => {
                     try {
                       setIsLoading(true);
-                      console.log(
-                        "[ChangePasswordForm] Initiation manual logout...",
-                      );
                       await logout();
                     } catch (err: any) {
-                      console.log(
-                        "[ChangePasswordForm] Logout failed:",
-                        err.message,
-                      );
                       Alert.alert(
                         "Logout Failed",
                         getRequestErrorMessage(

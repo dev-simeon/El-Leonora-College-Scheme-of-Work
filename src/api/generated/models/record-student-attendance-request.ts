@@ -25,7 +25,7 @@ export interface RecordStudentAttendanceRequest {
      * @type {string}
      * @memberof RecordStudentAttendanceRequest
      */
-    'studentId'?: string;
+    'studentAdmissionNo'?: string;
     /**
      * 
      * @type {string}

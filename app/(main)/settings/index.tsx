@@ -190,8 +190,9 @@ export default function SettingsScreen() {
         .join(" · ")
     : null;
 
-  // Role-based visibility for the overlapping card
-  const showClassCard = !isLoading && !!profileData?.classInfo;
+  // Temporarily keep the class card visible so its layout can be previewed
+  // even when the profile has no assigned class.
+  const showClassCard = true;
 
   return (
     <SafeAreaView style={styles.safeContainer} edges={["left", "right"]}>
@@ -240,8 +241,6 @@ export default function SettingsScreen() {
             )}
           </View>
 
-          {/* Curved bottom edge */}
-          <View style={styles.heroCurve} />
         </LinearGradient>
 
         {/* ── Error state ────────────────────────────────────── */}
@@ -258,13 +257,14 @@ export default function SettingsScreen() {
             <View
               style={[
                 styles.classCard,
+                styles.classCardOverlap,
                 { justifyContent: "center", minHeight: 88 },
               ]}
             >
               <ActivityIndicator color="#135BEC" />
             </View>
           ) : showClassCard ? (
-            <View style={styles.classCard}>
+            <View style={[styles.classCard, styles.classCardOverlap]}>
               <View style={styles.classIconWrap}>
                 <Ionicons
                   name={isStudent ? "school-outline" : "briefcase-outline"}
@@ -354,6 +354,15 @@ export default function SettingsScreen() {
                 label="About & Updates"
                 subtitle="Version info and changelog"
                 onPress={() => router.push("/(main)/settings/about")}
+              />
+              <View style={styles.divider} />
+              <SettingRow
+                icon="scan-outline"
+                iconColor="#135BEC"
+                iconBg="#EFF6FF"
+                label="Safe Area Diagnostic"
+                subtitle="Inspect iOS status bar and viewport insets"
+                onPress={() => router.push("/(main)/settings/safe-area-check")}
               />
             </View>
           </View>
@@ -464,7 +473,7 @@ const styles = StyleSheet.create({
   heroInfo: {
     alignItems: "center",
     marginTop: 12,
-    marginBottom: 50, // Pushes the curve and overlay card down
+    marginBottom: 86, // Extends the hero behind the curved surface at the class card center
     paddingHorizontal: 20,
   },
   heroName: {
@@ -528,14 +537,6 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   chipValue: { fontSize: 13, color: "#FFFFFF", fontWeight: "700" },
-  heroCurve: {
-    alignSelf: "stretch",
-    height: 20, // Reduced height per user request
-    backgroundColor: "#F6F6F8",
-    borderTopLeftRadius: 32,
-    borderTopRightRadius: 32,
-  },
-
   // ── Class Card ───────────────────────────────────────────────────────
   classCard: {
     backgroundColor: "#FFFFFF",
@@ -604,9 +605,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24, // Pushed inside for tighter look
     paddingTop: 0,
     paddingBottom: 40,
-    marginTop: -64,
+    marginTop: -40,
+    backgroundColor: COLORS.backgroundLight,
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
     gap: 8,
   },
+  classCardOverlap: { marginTop: -36 },
   group: { marginTop: 8, gap: 6 },
   groupTitle: {
     fontSize: 11,

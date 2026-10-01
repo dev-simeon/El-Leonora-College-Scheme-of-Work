@@ -81,7 +81,9 @@ export default function StudentDashboard() {
       <StatusBar style="dark" />
 
       {/* Top Header */}
-      <View style={[styles.header, { paddingTop: Math.max(insets.top, 20) }]}>
+      <View
+        style={[styles.header, { paddingTop: Math.max(insets.top - 6, 12) }]}
+      >
         <View style={styles.headerLeft}>
           <Image
             source={{
@@ -91,7 +93,7 @@ export default function StudentDashboard() {
             style={styles.avatar}
           />
         </View>
-        <Pressable style={styles.notificationBtn}>
+        <Pressable style={styles.notificationBtn} hitSlop={10}>
           <Ionicons
             name="notifications-outline"
             size={24}
@@ -478,7 +480,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 10,
     paddingBottom: 16,
-    backgroundColor: "rgba(248, 249, 250, 0.9)",
+    backgroundColor: "#FFFFFF",
     zIndex: 10,
   },
   headerLeft: {
@@ -487,25 +489,25 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     backgroundColor: STITCH_COLORS.surfaceContainerHigh,
-    borderWidth: 2,
+    borderWidth: 1,
     borderColor: "rgba(195, 198, 214, 0.15)",
   },
   notificationBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
     position: "relative",
   },
   notificationBadge: {
     position: "absolute",
-    top: 8,
-    right: 8,
+    top: 0,
+    right: 0,
     width: 8,
     height: 8,
     backgroundColor: STITCH_COLORS.error,

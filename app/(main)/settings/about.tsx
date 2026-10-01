@@ -18,20 +18,21 @@ import { BackButton } from "../../../src/components/BackButton";
 import { getRequestErrorMessage } from "../../../src/utils/apiError";
 import { COLORS } from "../../../src/constants/colors";
 import versionData from "../../../src/constants/version.json";
-import { compareVersions } from 'compare-versions';
+import { compareVersions } from "compare-versions";
 import { getLatestVersion } from "../../../src/services/versionService";
-import { downloadAndInstallApk, DownloadProgress } from "../../../src/services/updateService";
+import {
+  downloadAndInstallApk,
+  DownloadProgress,
+} from "../../../src/services/updateService";
 import { AppVersionResponseDto } from "../../../src/api/generated/models";
-
-
-
 
 export default function AboutScreen() {
   const router = useRouter();
   const { showToast } = useToast();
   const insets = useSafeAreaInsets();
   const [isChecking, setIsChecking] = useState(false);
-  const [downloadProgress, setDownloadProgress] = useState<DownloadProgress | null>(null);
+  const [downloadProgress, setDownloadProgress] =
+    useState<DownloadProgress | null>(null);
   const [isDownloading, setIsDownloading] = useState(false);
 
   const appInfo = {
@@ -47,9 +48,12 @@ export default function AboutScreen() {
         setDownloadProgress(progress);
       });
     } catch (error: any) {
-      showToast({ 
-        message: getRequestErrorMessage(error, "Could not download the update. Please try again."), 
-        type: "error" 
+      showToast({
+        message: getRequestErrorMessage(
+          error,
+          "Could not download the update. Please try again.",
+        ),
+        type: "error",
       });
     } finally {
       setIsDownloading(false);
@@ -62,11 +66,13 @@ export default function AboutScreen() {
     try {
       // Fetch latest version from server
       const remoteInfo: AppVersionResponseDto = await getLatestVersion();
-      
-      const serverVersion = remoteInfo.latestVersion || "0.0.0";
+
+      const serverVersion = remoteInfo.version || "0.0.0";
       const currentVersion = versionData.versionName;
 
-      console.log(`[About] Version Check: Current=${currentVersion}, Remote=${serverVersion}`);
+      console.log(
+        `[About] Version Check: Current=${currentVersion}, Remote=${serverVersion}`,
+      );
 
       // Semantic version comparison: only prompt if server version is strictly newer
       if (compareVersions(serverVersion, currentVersion) === 1) {
@@ -74,9 +80,9 @@ export default function AboutScreen() {
           "Update Available",
           `A new version (${serverVersion}) is available.\n\n${remoteInfo.forceUpdate ? "This update is required for continued operation.\n\n" : ""}Notes: ${remoteInfo.releaseNotes || "Performance improvements and bug fixes."}`,
           [
-            { 
-              text: remoteInfo.forceUpdate ? "Close App" : "Later", 
-              style: "cancel" 
+            {
+              text: remoteInfo.forceUpdate ? "Close App" : "Later",
+              style: "cancel",
             },
             {
               text: "Update Now",
@@ -84,23 +90,33 @@ export default function AboutScreen() {
                 if (remoteInfo.downloadUrl) {
                   handleInstallUpdate(remoteInfo.downloadUrl, serverVersion);
                 } else {
-                  showToast({ message: "Download URL is not available. Please try again later.", type: "error" });
+                  showToast({
+                    message:
+                      "Download URL is not available. Please try again later.",
+                    type: "error",
+                  });
                 }
               },
             },
           ],
-          { cancelable: !remoteInfo.forceUpdate }
+          { cancelable: !remoteInfo.forceUpdate },
         );
       } else {
         Alert.alert(
           "Up to Date",
           `You're running the latest version (${currentVersion}).`,
-          [{ text: "Great!" }]
+          [{ text: "Great!" }],
         );
       }
     } catch (error: any) {
       console.error("[About] checkForUpdates Error:", error);
-      showToast({ message: getRequestErrorMessage(error, "Could not check for updates. Please try again later."), type: "error" });
+      showToast({
+        message: getRequestErrorMessage(
+          error,
+          "Could not check for updates. Please try again later.",
+        ),
+        type: "error",
+      });
     } finally {
       setIsChecking(false);
     }
@@ -109,7 +125,7 @@ export default function AboutScreen() {
   return (
     <View style={styles.outer}>
       <StatusBar style="dark" />
-      
+
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
         <BackButton onPress={() => router.back()} />
@@ -117,8 +133,8 @@ export default function AboutScreen() {
         <View style={{ width: 40 }} />
       </View>
 
-      <ScrollView 
-        style={styles.container} 
+      <ScrollView
+        style={styles.container}
         contentContainerStyle={styles.contentContainer}
         showsVerticalScrollIndicator={false}
       >
@@ -131,7 +147,9 @@ export default function AboutScreen() {
             <View style={styles.logoPulse} />
           </View>
           <Text style={styles.appName}>{appInfo.name}</Text>
-          <Text style={styles.appTagline}>Empowering teachers, building futures.</Text>
+          <Text style={styles.appTagline}>
+            Empowering teachers, building futures.
+          </Text>
           <View style={{ height: 12 }} />
           <View style={styles.versionBadge}>
             <Text style={styles.versionBadgeText}>v{appInfo.version}</Text>
@@ -145,20 +163,29 @@ export default function AboutScreen() {
             <Text style={styles.sectionTitleText}>Our Mission</Text>
           </View>
           <Text style={styles.missionText}>
-            El-Leonora College Scheme of Work is designed to streamline academic planning and content delivery. We provide teachers with the tools they need to manage their curriculum efficiently, ensuring a consistent and high-quality learning experience for every student.
+            El-Leonora College Scheme of Work is designed to streamline academic
+            planning and content delivery. We provide teachers with the tools
+            they need to manage their curriculum efficiently, ensuring a
+            consistent and high-quality learning experience for every student.
           </Text>
         </View>
 
         {/* App Info Card */}
         <View style={styles.sectionCard}>
           <View style={styles.sectionHeader}>
-            <Ionicons name="information-circle-outline" size={20} color={COLORS.primary} />
+            <Ionicons
+              name="information-circle-outline"
+              size={20}
+              color={COLORS.primary}
+            />
             <Text style={styles.sectionTitleText}>Application Details</Text>
           </View>
-          
+
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Platform</Text>
-            <Text style={styles.infoValue}>{Platform.OS === 'ios' ? 'iOS' : 'Android'}</Text>
+            <Text style={styles.infoValue}>
+              {Platform.OS === "ios" ? "iOS" : "Android"}
+            </Text>
           </View>
           <View style={styles.separator} />
           <View style={styles.infoRow}>
@@ -184,14 +211,17 @@ export default function AboutScreen() {
                 <View
                   style={[
                     styles.progressFill,
-                    { width: `${Math.round((downloadProgress?.progress ?? 0) * 100)}%` },
+                    {
+                      width: `${Math.round((downloadProgress?.progress ?? 0) * 100)}%`,
+                    },
                   ]}
                 />
               </View>
               {downloadProgress && (
                 <Text style={styles.progressBytes}>
-                  {(downloadProgress.downloadedBytes / 1024 / 1024).toFixed(1)} MB /{" "}
-                  {(downloadProgress.totalBytes / 1024 / 1024).toFixed(1)} MB
+                  {(downloadProgress.downloadedBytes / 1024 / 1024).toFixed(1)}{" "}
+                  MB / {(downloadProgress.totalBytes / 1024 / 1024).toFixed(1)}{" "}
+                  MB
                 </Text>
               )}
             </View>
@@ -218,12 +248,17 @@ export default function AboutScreen() {
 
           <Pressable
             style={styles.secondaryButton}
-            onPress={() => showToast({ message: "All third-party libraries used in this app are subject to their respective MIT/Apache licenses.", type: "info" })}
+            onPress={() =>
+              showToast({
+                message:
+                  "All third-party libraries used in this app are subject to their respective MIT/Apache licenses.",
+                type: "info",
+              })
+            }
           >
             <Text style={styles.secondaryButtonText}>Open Source Licenses</Text>
           </Pressable>
         </View>
-
 
         <Text style={styles.copyrightText}>
           © 2026 El-Leonora College. All rights reserved.
@@ -234,9 +269,9 @@ export default function AboutScreen() {
 }
 
 const styles = StyleSheet.create({
-  outer: { 
-    flex: 1, 
-    backgroundColor: "#F8FAFC" 
+  outer: {
+    flex: 1,
+    backgroundColor: "#F8FAFC",
   },
   header: {
     flexDirection: "row",
@@ -256,7 +291,7 @@ const styles = StyleSheet.create({
     flex: 1,
     textAlign: "center",
   },
-  container: { 
+  container: {
     flex: 1,
   },
   contentContainer: {

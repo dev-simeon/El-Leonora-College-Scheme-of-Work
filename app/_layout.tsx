@@ -48,6 +48,22 @@ function RootLayoutNav() {
     }
   }, [token, isLoading, mustChangePassword, segments]);
 
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+
+    const routePath = segments.join("/");
+    const statusSurface = routePath === "(main)/settings"
+      ? COLORS.brandBlue
+      : routePath.startsWith("(main)/fees")
+        ? COLORS.primary
+        : "#FFFFFF";
+
+    document.documentElement.style.setProperty(
+      "--ios-pwa-status-surface",
+      statusSurface,
+    );
+  }, [segments]);
+
   if (isLoading) {
     return (
       <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: COLORS.backgroundLight }}>
