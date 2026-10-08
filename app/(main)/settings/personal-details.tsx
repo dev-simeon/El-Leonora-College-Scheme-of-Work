@@ -1,7 +1,7 @@
 import React, { useEffect } from "react";
 import {
   View,
-  Text,
+  Text as NativeText,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
@@ -10,6 +10,7 @@ import {
   Image,
   RefreshControl,
 } from "react-native";
+import { LexendText as Text } from "../../../src/components/LexendText";
 import { useQuery } from "@tanstack/react-query";
 import { useIsFocused } from "expo-router/react-navigation";
 import {
@@ -31,6 +32,7 @@ import {
 } from "../../../src/utils/apiError";
 import { formatGender } from "../../../src/utils/helpers";
 import type { BasicSchoolUserProfileDto } from "../../../src/api/generated/models";
+import { useProfileImageUrl } from "../../../src/hooks/useProfileImageUrl";
 
 // ─── API Clients ──────────────────────────────────────────────────────────────
 const accountApi = new AccountApi(
@@ -78,6 +80,7 @@ export default function PersonalDetailsScreen() {
   const isFocused = useIsFocused();
   const { user } = useAuth();
   const { showToast } = useToast();
+  const { data: profileImageUrl } = useProfileImageUrl();
 
   const isStudent = user?.role === "student";
   const isStaff = user?.role === "staff";
@@ -189,12 +192,17 @@ export default function PersonalDetailsScreen() {
                 <View style={styles.avatarOuter}>
                   {/* Large Circle for Avatar */}
                   <View style={styles.avatarInner}>
-                    <Text style={styles.avatarInitials}>{initials}</Text>
+                    {profileImageUrl ? (
+                      <Image
+                        source={{ uri: profileImageUrl }}
+                        style={styles.avatarPhoto}
+                        resizeMode="cover"
+                      />
+                    ) : (
+                      <Text style={styles.avatarInitials}>{initials}</Text>
+                    )}
                   </View>
                 </View>
-                <TouchableOpacity style={styles.editBadge}>
-                  <Ionicons name="pencil" size={14} color="#FFFFFF" />
-                </TouchableOpacity>
               </View>
               <Text style={styles.profileName}>{displayName}</Text>
               <Text style={styles.profileRole}>
@@ -344,6 +352,11 @@ const styles = StyleSheet.create({
     fontSize: 40,
     fontWeight: "700",
     color: "#135BEC",
+  },
+  avatarPhoto: {
+    width: "100%",
+    height: "100%",
+    borderRadius: 56,
   },
   editBadge: {
     position: "absolute",

@@ -1,13 +1,14 @@
 import React, { useEffect, useCallback } from "react";
 import {
   View,
-  Text,
+  Text as NativeText,
   StyleSheet,
   FlatList,
   RefreshControl,
   ActivityIndicator,
   Pressable,
 } from "react-native";
+import { LexendText as Text } from "../../../src/components/LexendText";
 import { useQuery, useInfiniteQuery } from "@tanstack/react-query";
 import { useIsFocused } from "expo-router/react-navigation";
 import { StatusBar } from "expo-status-bar";

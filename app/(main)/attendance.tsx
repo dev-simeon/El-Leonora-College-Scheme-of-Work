@@ -3,32 +3,41 @@ import {
   ActivityIndicator,
   Animated,
   FlatList,
+  Keyboard,
   Modal,
   Platform,
   Pressable,
   StatusBar,
   StyleSheet,
-  Text,
-  TextInput,
+  ScrollView,
+  Text as NativeText,
+  TextInput as NativeTextInput,
   TouchableOpacity,
   View,
 } from "react-native";
+import {
+  LexendText as Text,
+  LexendTextInput as TextInput,
+} from "../../src/components/LexendText";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "../../src/context/AuthContext";
 import { useRouter } from "expo-router";
 import { COLORS } from "../../src/constants/colors";
-import {
-  AttendanceAction,
-  AttendanceService,
-} from "../../src/services/attendanceService";
 import { ClassesApi } from "../../src/api/generated/endpoints/classes-api";
 import { StudentsApi } from "../../src/api/generated/endpoints/students-api";
 import { AttendanceApi } from "../../src/api/generated/endpoints/attendance-api";
 import { TermsApi } from "../../src/api/generated/endpoints/terms-api";
+import { GetTermActivitiesFilterEnum } from "../../src/api/generated/endpoints/terms-api";
+import { AcademicSessionsApi } from "../../src/api/generated/endpoints/academic-sessions-api";
 import { StaffsApi } from "../../src/api/generated/endpoints/staffs-api";
-import { RecordStudentAttendanceRequestStatusEnum } from "../../src/api/generated/models/record-student-attendance-request";
+import {
+  RecordGateAttendanceRequestGateReasonEnum,
+  RecordGateAttendanceRequestGateTypeEnum,
+} from "../../src/api/generated/models/record-gate-attendance-request";
+import { ClassroomAttendanceItemStatusEnum } from "../../src/api/generated/models/classroom-attendance-item";
+import type { BulkClassroomAttendanceRequest } from "../../src/api/generated/models/bulk-classroom-attendance-request";
 import { Configuration } from "../../src/api/generated/configuration";
 import api, { API_BASE_URL } from "../../src/services/api";
 import {
@@ -47,7 +56,8 @@ type Person = {
 };
 type ClassOption = { id: string; label: string; itemKey: string };
 type CheckoutOption = "day" | "reason";
-type SuccessAction = Exclude<AttendanceAction, "check_out_required">;
+type SuccessAction = "check_in" | "check_out";
+const manualAttendanceByClass = new Map<string, string[]>();
 const STAFF: Person[] = [
   { id: "STF-2024-001", name: "Dr. Sarah Johnson" },
   { id: "STF-2024-002", name: "Prof. Michael Smith" },
@@ -97,12 +107,12 @@ const CHECK_IN_STUDENTS: Person[] = [
   },
 ];
 const REASONS = [
-  "School Event",
-  "School Errand",
-  "Medical",
-  "Early Pickup",
-  "School Closed",
-  "Other",
+  { label: "School Event", value: RecordGateAttendanceRequestGateReasonEnum.SchoolEvent },
+  { label: "School Errand", value: RecordGateAttendanceRequestGateReasonEnum.SchoolErrand },
+  { label: "Medical", value: RecordGateAttendanceRequestGateReasonEnum.Medical },
+  { label: "Early Pickup", value: RecordGateAttendanceRequestGateReasonEnum.EarlyPickup },
+  { label: "School Closed", value: RecordGateAttendanceRequestGateReasonEnum.SchoolClosed },
+  { label: "Other", value: RecordGateAttendanceRequestGateReasonEnum.Other },
 ] as const;
 const classesApi = new ClassesApi(
   new Configuration({ basePath: API_BASE_URL }),
@@ -124,6 +134,11 @@ const termsApi = new TermsApi(
   API_BASE_URL,
   api,
 );
+const academicSessionsApi = new AcademicSessionsApi(
+  new Configuration({ basePath: API_BASE_URL }),
+  API_BASE_URL,
+  api,
+);
 const staffsApi = new StaffsApi(
   new Configuration({ basePath: API_BASE_URL }),
   API_BASE_URL,
@@ -133,6 +148,15 @@ const nameOf = (student: any) =>
   [student?.firstName, student?.middleName, student?.lastName]
     .filter(Boolean)
     .join(" ") || "Student";
+const formatPersonName = (value: string) =>
+  value
+    .trim()
+    .toLocaleLowerCase()
+    .replace(
+      /(^|[\s'-])([a-z])/g,
+      (_match, separator, letter) =>
+        `${separator}${letter.toLocaleUpperCase()}`,
+    );
 const stripArmSuffix = (value: string) => {
   if (!value) return "";
 
@@ -227,10 +251,13 @@ const parseStudentQr = (data: string) => {
 };
 
 const getAssignedClassFromToken = (token: string | null | undefined) => {
-  const claims = token ? decodeJwt(token) as Record<string, unknown> | null : null;
+  const claims = token
+    ? (decodeJwt(token) as Record<string, unknown> | null)
+    : null;
   if (!claims) return null;
 
-  const normalizeKey = (key: string) => key.toLowerCase().replace(/[^a-z0-9]/g, "");
+  const normalizeKey = (key: string) =>
+    key.toLowerCase().replace(/[^a-z0-9]/g, "");
   const claim = (names: string[]) => {
     const normalizedNames = names.map(normalizeKey);
     const entry = Object.entries(claims).find(([key]) => {
@@ -251,22 +278,27 @@ const getAssignedClassFromToken = (token: string | null | undefined) => {
 
   let assigned = claim(["assignedClass", "classInfo", "homeroomClass"]);
   if (Array.isArray(assigned)) assigned = assigned[0];
-  const nested = assigned && typeof assigned === "object"
-    ? assigned as Record<string, unknown>
-    : null;
+  const nested =
+    assigned && typeof assigned === "object"
+      ? (assigned as Record<string, unknown>)
+      : null;
   const nestedEntries = nested ? Object.entries(nested) : [];
   const nestedValue = (names: string[]) => {
     const normalizedNames = names.map(normalizeKey);
-    return nestedEntries.find(([key]) => normalizedNames.includes(normalizeKey(key)))?.[1];
+    return nestedEntries.find(([key]) =>
+      normalizedNames.includes(normalizeKey(key)),
+    )?.[1];
   };
 
-  const id = asId(claim(["assignedClassId", "classId", "homeroomClassId"]))
-    ?? asId(nestedValue(["classId", "id", "assignedClassId"]));
+  const id =
+    asId(claim(["assignedClassId", "classId", "homeroomClassId"])) ??
+    asId(nestedValue(["classId", "id", "assignedClassId"]));
   if (!id) return null;
 
-  const label = asId(claim(["className", "classCode", "assignedClassName"]))
-    ?? asId(nestedValue(["className", "classCode", "code", "name", "level"]))
-    ?? "Assigned Class";
+  const label =
+    asId(claim(["className", "classCode", "assignedClassName"])) ??
+    asId(nestedValue(["className", "classCode", "code", "name", "level"])) ??
+    "Assigned Class";
   return { id, label };
 };
 
@@ -278,6 +310,7 @@ export default function AttendanceScreen() {
   const [permission, requestPermission] = useCameraPermissions();
   const [activeTab, setActiveTab] = useState<"Students" | "Staff">("Students");
   const [scannerOpen, setScannerOpen] = useState(false);
+  const [scannerError, setScannerError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [success, setSuccess] = useState<{
@@ -291,21 +324,9 @@ export default function AttendanceScreen() {
     name: string;
   } | null>(null);
   const [option, setOption] = useState<CheckoutOption | null>(null);
-  const [reason, setReason] = useState<string | null>(null);
+  const [reason, setReason] = useState<RecordGateAttendanceRequestGateReasonEnum | null>(null);
   const [otherReason, setOtherReason] = useState("");
   const [reasonMenuOpen, setReasonMenuOpen] = useState(false);
-  const [eventDialogOpen, setEventDialogOpen] = useState(false);
-  const [eventLoading, setEventLoading] = useState(false);
-  const [events, setEvents] = useState<{ id: string; label: string }[]>([]);
-  const [supervisors, setSupervisors] = useState<
-    { id: string; label: string }[]
-  >([]);
-  const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
-  const [selectedSupervisorId, setSelectedSupervisorId] = useState<
-    string | null
-  >(null);
-  const [eventMenuOpen, setEventMenuOpen] = useState(false);
-  const [supervisorMenuOpen, setSupervisorMenuOpen] = useState(false);
   const [manualMode, setManualMode] = useState(false);
   const [classes, setClasses] = useState<ClassOption[]>([]);
   const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
@@ -323,10 +344,12 @@ export default function AttendanceScreen() {
   const scanLock = useRef(false);
   const isWeb = Platform.OS === "web";
   const isAdmin = user?.backendRole?.toLowerCase().includes("admin") ?? false;
-  const isTeacher = user?.backendRole
-    ?.split(/[,;|]/)
-    .some((role) => role.trim().toLowerCase() === "teacher") ?? false;
+  const isTeacher =
+    user?.backendRole
+      ?.split(/[,;|]/)
+      .some((role) => role.trim().toLowerCase() === "teacher") ?? false;
   const assignedClass = getAssignedClassFromToken(token);
+  const canSeeGateCheckIns = isAdmin;
   const normalList = activeTab === "Students" ? gateCheckIns : STAFF;
   const selectedClass = classes.find((item) => item.id === selectedClassId);
   const summary =
@@ -375,7 +398,14 @@ export default function AttendanceScreen() {
     setAssignmentLoading(false);
     setGateCheckIns([]);
     setGateCheckInsLoading(false);
-  }, [user?.id, user?.backendRole, token, isAdmin, isTeacher, assignedClass?.id]);
+  }, [
+    user?.id,
+    user?.backendRole,
+    token,
+    isAdmin,
+    isTeacher,
+    assignedClass?.id,
+  ]);
   useEffect(() => {
     if (manualMode && selectedClassId) void loadClassStudents(selectedClassId);
   }, [selectedClassId, manualMode]);
@@ -397,6 +427,7 @@ export default function AttendanceScreen() {
   };
   const openScanner = async () => {
     scanLock.current = false;
+    setScannerError(null);
 
     if (isWeb && typeof window !== "undefined" && !window.isSecureContext) {
       showToast({
@@ -432,7 +463,14 @@ export default function AttendanceScreen() {
   };
   const scan = async ({ data }: { data: string }) => {
     const qr = parseStudentQr(data);
-    const studentAdmissionNo = qr.admissionNumber?.trim();
+    const scannedAdmissionNo = qr.admissionNumber?.trim();
+    // Student admission numbers without the STU prefix use underscores in the
+    // attendance API, while STU-prefixed numbers are already in API format.
+    const studentAdmissionNo = scannedAdmissionNo
+      ? /stu/i.test(scannedAdmissionNo)
+        ? scannedAdmissionNo
+        : scannedAdmissionNo.replace(/\//g, "_")
+      : undefined;
     if (!studentAdmissionNo || scanLock.current) {
       if (!studentAdmissionNo) {
         showToast({
@@ -443,23 +481,15 @@ export default function AttendanceScreen() {
       return;
     }
     scanLock.current = true;
+    setScannerError(null);
     setUserId(studentAdmissionNo);
     setLoading(true);
     let operation = "check student attendance status";
     try {
       if (activeTab === "Staff") {
-        const response = await AttendanceService.scanAttendance(studentAdmissionNo);
-        setScannerOpen(false);
-        if (response.action === "check_out_required") {
-          resetCheckout();
-          setCheckoutOpen(true);
-        } else
-          setSuccess({
-            action: "check_in",
-            timestamp:
-              AttendanceService.getLatestLog(studentAdmissionNo)?.timestamp ?? new Date(),
-          });
-        return;
+        throw new Error(
+          "Staff QR attendance is not supported by the student attendance API.",
+        );
       }
       const statusRequest = { studentAdmissionNo };
       const statusPath = `/api/Attendance/students/${encodeURIComponent(studentAdmissionNo)}/status`;
@@ -469,7 +499,8 @@ export default function AttendanceScreen() {
         path: statusPath,
         pathParameter: { studentAdmissionNo },
       });
-      const statusResponse = await attendanceApi.getStudentStatus(statusRequest);
+      const statusResponse =
+        await attendanceApi.getStudentStatus(statusRequest);
       console.log("[Attendance Status API] Response", {
         httpStatus: statusResponse.status,
         data: statusResponse.data,
@@ -486,11 +517,13 @@ export default function AttendanceScreen() {
       }
       const status = statusResponse.data.data as any;
       const isCurrentlyInSchool =
-        status?.isCurrentlyInSchool ??
-        status?.isPresent ??
-        (typeof status?.isOutsideSchool === "boolean"
-          ? !status.isOutsideSchool
-          : !status?.activeMovement);
+        typeof status?.isCurrentlyInSchool === "boolean"
+          ? status.isCurrentlyInSchool
+          : typeof status?.isPresent === "boolean"
+            ? status.isPresent && status.isOutsideSchool !== true
+            : typeof status?.isOutsideSchool === "boolean"
+              ? !status.isOutsideSchool
+              : !status?.activeMovement;
       const knownStudent = CHECK_IN_STUDENTS.find(
         (student) => student.admissionNumber === studentAdmissionNo,
       );
@@ -501,31 +534,32 @@ export default function AttendanceScreen() {
         knownStudent?.name ??
         `Student ${studentAdmissionNo}`;
       setScannedStudent({ id: studentAdmissionNo, name: studentName });
-      setScannerOpen(false);
       if (isCurrentlyInSchool) {
+        setScannerOpen(false);
         resetCheckout();
         setOption("reason");
         setCheckoutOpen(true);
       } else {
         operation = "record student attendance";
         const recordRequest = {
-          recordStudentAttendanceRequest: {
-            studentAdmissionNo,
-            status: RecordStudentAttendanceRequestStatusEnum.Present,
-          },
+          studentAdmissionNo,
+          gateType: RecordGateAttendanceRequestGateTypeEnum.CheckIn,
         };
         console.log("[Attendance Record API] Request", {
           method: "POST",
           baseUrl: API_BASE_URL,
-          path: "/api/Attendance/students",
-          body: recordRequest.recordStudentAttendanceRequest,
+          path: "/api/Attendance/students/gate",
+          body: recordRequest,
         });
-        const recordResponse = await attendanceApi.recordStudentAttendance(recordRequest);
+        const recordResponse =
+          await attendanceApi.recordGateAttendance({
+            recordGateAttendanceRequest: recordRequest,
+          });
         console.log("[Attendance Record API] Response", {
           httpStatus: recordResponse.status,
           data: recordResponse.data,
         });
-        if (recordResponse.data.success !== true || !recordResponse.data.data) {
+        if (recordResponse.data.success !== true) {
           const apiError = new Error(
             getApiErrorMessage(
               recordResponse.data,
@@ -535,8 +569,9 @@ export default function AttendanceScreen() {
           apiError.apiResponse = recordResponse.data;
           throw apiError;
         }
-        if (isAdmin) void loadGateCheckIns();
-        const recordedAt = recordResponse.data.data.lastAttendanceAt;
+        if (canSeeGateCheckIns) void loadGateCheckIns();
+        const recordedAt = recordResponse.data.data?.lastAttendanceAt;
+        setScannerOpen(false);
         setSuccess({
           action: "check_in",
           timestamp: recordedAt ? new Date(recordedAt) : new Date(),
@@ -548,43 +583,68 @@ export default function AttendanceScreen() {
           ? "Could not record this student's attendance."
           : "Could not check this student's attendance status.";
       const requestError = error as any;
-      const message = getRequestErrorMessage(requestError, fallback);
-      const responseData =
-        requestError?.response?.data ?? requestError?.apiResponse;
-      console.warn("[Attendance] Request failed", {
-        operation,
-        status: requestError?.response?.status,
-        code: requestError?.code ?? responseData?.code ?? responseData?.Code,
-        message,
-        apiErrors: responseData?.errors ?? responseData?.Errors,
-        response: responseData,
-      });
-      showToast({
-        message,
-        type: "error",
-      });
+      console.log(error);
+      const message = getRequestErrorMessage(error, fallback);
+      if (scannerOpen) setScannerError(message);
+      else showToast({ message, type: "error" });
     } finally {
       setLoading(false);
       scanLock.current = false;
     }
   };
-  const selectedReason = reason === "Other" ? otherReason.trim() : reason;
-  const canSubmit = Boolean(selectedReason);
-  const submitCheckout = async () => {
+  const selectedReason = reason;
+  const canSubmit = Boolean(selectedReason) &&
+    (selectedReason !== RecordGateAttendanceRequestGateReasonEnum.Other || Boolean(otherReason.trim()));
+  const submitCheckout = async (_eventDetails?: {
+    schoolEventId?: string;
+    approvedByStaffId?: string;
+  }) => {
     if (!userId || !canSubmit) return;
+    const requestBody = {
+      studentAdmissionNo: userId,
+      gateType: RecordGateAttendanceRequestGateTypeEnum.CheckOut,
+      gateReason: selectedReason,
+      ...(selectedReason === RecordGateAttendanceRequestGateReasonEnum.Other
+        ? { otherReason: otherReason.trim() }
+        : {}),
+    };
     setLoading(true);
     try {
-      const response = await AttendanceService.checkOutForReason(
-        userId,
-        selectedReason!,
-      );
+      console.log("[Attendance Record API] Checkout request", {
+        method: "POST",
+        baseUrl: API_BASE_URL,
+        path: "/api/Attendance/students/gate",
+        body: requestBody,
+      });
+      const response = await attendanceApi.recordGateAttendance({
+        recordGateAttendanceRequest: requestBody,
+      });
+      console.log("[Attendance Record API] Checkout response", {
+        httpStatus: response.status,
+        data: response.data,
+      });
+      if (response.data.success !== true) {
+        const apiError = new Error(
+          getApiErrorMessage(
+            response.data,
+            "Could not record the student's checkout.",
+          ),
+        ) as Error & { apiResponse?: unknown };
+        apiError.apiResponse = response.data;
+        throw apiError;
+      }
       setCheckoutOpen(false);
       setSuccess({
-        action: response.action as SuccessAction,
-        timestamp:
-          AttendanceService.getLatestLog(userId)?.timestamp ?? new Date(),
-        reason: selectedReason ?? undefined,
+        action: "check_out",
+        timestamp: response.data.data?.lastAttendanceAt
+          ? new Date(response.data.data.lastAttendanceAt)
+          : new Date(),
+        reason:
+          selectedReason === RecordGateAttendanceRequestGateReasonEnum.Other
+            ? otherReason.trim()
+            : REASONS.find((item) => item.value === selectedReason)?.label,
       });
+      if (canSeeGateCheckIns) void loadGateCheckIns();
     } catch (error) {
       showToast({
         message: getRequestErrorMessage(
@@ -596,60 +656,6 @@ export default function AttendanceScreen() {
     } finally {
       setLoading(false);
     }
-  };
-  const openSchoolEventDialog = async () => {
-    setEventDialogOpen(true);
-    setEventLoading(true);
-    setSelectedEventId(null);
-    setSelectedSupervisorId(null);
-    try {
-      const [eventsResponse, staffsResponse] = await Promise.all([
-        termsApi.getTermActivities({
-          termId: user?.currentTermId ?? "2",
-          pageSize: 100,
-        }),
-        staffsApi.getStaffs({ pageSize: 100 }),
-      ]);
-      setEvents(
-        (eventsResponse.data.items ?? [])
-          .map((event: any) => ({
-            id: event.id ?? "",
-            label: event.title ?? "School event",
-          }))
-          .filter((event) => event.id),
-      );
-      setSupervisors(
-        (staffsResponse.data.items ?? [])
-          .map((staff: any) => ({
-            id: staff.id ?? "",
-            label:
-              [staff.firstName, staff.lastName].filter(Boolean).join(" ") ||
-              staff.staffNo ||
-              "Staff member",
-          }))
-          .filter((staff) => staff.id),
-      );
-    } catch (error) {
-      setEventDialogOpen(false);
-      showToast({
-        message: getRequestErrorMessage(
-          error,
-          "Could not load school events and staff.",
-        ),
-        type: "error",
-      });
-    } finally {
-      setEventLoading(false);
-    }
-  };
-  const confirmSchoolEvent = () => {
-    const event = events.find((item) => item.id === selectedEventId);
-    const supervisor = supervisors.find(
-      (item) => item.id === selectedSupervisorId,
-    );
-    if (!event || !supervisor) return;
-    setReason(`School Event: ${event.label} — Supervisor: ${supervisor.label}`);
-    setEventDialogOpen(false);
   };
   const toggleActions = () => {
     const open = !actionsOpen;
@@ -674,13 +680,14 @@ export default function AttendanceScreen() {
     setManualMode(true);
   };
   const loadGateCheckIns = async () => {
-    if (!isAdmin) {
+    if (!canSeeGateCheckIns) {
       setGateCheckIns([]);
       setGateCheckInsLoading(false);
       return;
     }
 
     setGateCheckInsLoading(true);
+    let requestStage = "classroom attendance list";
     try {
       const now = new Date();
       // The API contract is a calendar date (yyyy-MM-dd), not a UTC timestamp.
@@ -690,41 +697,159 @@ export default function AttendanceScreen() {
         String(now.getMonth() + 1).padStart(2, "0"),
         String(now.getDate()).padStart(2, "0"),
       ].join("-");
-      const pageSize = 100;
-      const firstPage = await attendanceApi.getClassroomAttendance({
+      const pageSize = 500;
+      const firstPageParams = {
+        classId: isAdmin ? undefined : assignedClass?.id,
         fromDate,
         pageNumber: 1,
         pageSize,
+      };
+      console.log("[Classroom Attendance API] Request", {
+        method: "GET",
+        baseUrl: API_BASE_URL,
+        path: "/api/Attendance/students",
+        params: firstPageParams,
+      });
+      const firstPage = await attendanceApi.getClassroomAttendance(
+        firstPageParams,
+      );
+      console.log("[Classroom Attendance API] Response", {
+        pageNumber: 1,
+        httpStatus: firstPage.status,
+        data: firstPage.data,
       });
       if (firstPage.data.success === false) {
+        console.error("[Classroom Attendance API] API error", {
+          pageNumber: 1,
+          httpStatus: firstPage.status,
+          data: firstPage.data,
+        });
         throw new Error(
-          getApiErrorMessage(firstPage.data, "Could not load today's gate check-ins."),
+          getApiErrorMessage(
+            firstPage.data,
+            "Could not load today's gate check-ins.",
+          ),
         );
       }
 
-      const totalPages = Math.max(1, firstPage.data.pagination?.totalPages ?? 1);
+      const totalPages = Math.max(
+        1,
+        firstPage.data.pagination?.totalPages ?? 1,
+      );
       const laterPages = await Promise.all(
-        Array.from({ length: totalPages - 1 }, (_, index) =>
-          attendanceApi.getClassroomAttendance({
+        Array.from({ length: totalPages - 1 }, async (_, index) => {
+          const pageNumber = index + 2;
+          const params = {
+            classId: isAdmin ? undefined : assignedClass?.id,
             fromDate,
-            pageNumber: index + 2,
+            pageNumber,
             pageSize,
-          }),
-        ),
+          };
+          console.log("[Classroom Attendance API] Request", {
+            method: "GET",
+            baseUrl: API_BASE_URL,
+            path: "/api/Attendance/students",
+            params,
+          });
+          const response = await attendanceApi.getClassroomAttendance(params);
+          console.log("[Classroom Attendance API] Response", {
+            pageNumber,
+            httpStatus: response.status,
+            data: response.data,
+          });
+          if (response.data.success === false) {
+            console.error("[Classroom Attendance API] API error", {
+              pageNumber,
+              httpStatus: response.status,
+              data: response.data,
+            });
+            throw new Error(
+              getApiErrorMessage(
+                response.data,
+                "Could not load today's gate check-ins.",
+              ),
+            );
+          }
+          return response;
+        }),
       );
       const records = [firstPage, ...laterPages].flatMap(
         (response) => response.data.items ?? [],
+      );
+      console.log("[Classroom Attendance API] Loaded records", {
+        fromDate,
+        totalPages,
+        recordCount: records.length,
+      });
+      // The attendance-list response currently has studentId but omits the
+      // admission number used by this screen. Resolve admission numbers from
+      // the student directory and join by database student id.
+      requestStage = "student directory lookup";
+      console.log("[Gate Check-In List] Student directory request", {
+        method: "GET",
+        baseUrl: API_BASE_URL,
+        path: "/api/v1/Students",
+        pageSize: 100,
+      });
+      const studentPage = await studentsApi.getStudents({
+        pageNumber: 1,
+        pageSize: 100,
+      });
+      console.log("[Gate Check-In List] Student directory response", {
+        pageNumber: 1,
+        httpStatus: studentPage.status,
+        data: studentPage.data,
+      });
+      const studentPages = Math.max(
+        1,
+        studentPage.data.pagination?.totalPages ?? 1,
+      );
+      const studentRest = await Promise.all(
+        Array.from({ length: studentPages - 1 }, async (_, index) => {
+          const pageNumber = index + 2;
+          console.log("[Gate Check-In List] Student directory request", {
+            method: "GET",
+            baseUrl: API_BASE_URL,
+            path: "/api/v1/Students",
+            pageNumber,
+            pageSize: 100,
+          });
+          const response = await studentsApi.getStudents({
+            pageNumber,
+            pageSize: 100,
+          });
+          console.log("[Gate Check-In List] Student directory response", {
+            pageNumber,
+            httpStatus: response.status,
+            data: response.data,
+          });
+          return response;
+        }),
+      );
+      const students = [studentPage, ...studentRest].flatMap(
+        (response) => response.data.items ?? [],
+      );
+      const studentById = new Map(
+        students.map((student: any) => [String(student.id), student]),
       );
       setGateCheckIns(
         records
           .map((record: any) => ({
             id: String(record.studentId ?? "").trim(),
-            name: String(record.fullName ?? record.studentName ?? "Student"),
+            name: formatPersonName(
+              String(
+                record.fullName ??
+                  record.studentName ??
+                  nameOf(studentById.get(String(record.studentId ?? ""))),
+              ),
+            ),
             admissionNumber:
               record.studentAdmissionNo ??
               record.admissionNumber ??
               record.admissionNo ??
               record.studentNumber ??
+              (studentById.get(String(record.studentId ?? "")) as any)
+                ?.admissionNumber ??
               "—",
             className: record.className ?? record.classCode,
             isInSchool:
@@ -735,11 +860,25 @@ export default function AttendanceScreen() {
           .filter((student) => student.id),
       );
     } catch (error) {
-      setGateCheckIns([]);
-      showToast({
+      const requestError = error as any;
+      console.error("[Gate Check-In List] Request failed", {
+        stage: requestStage,
+        httpStatus: requestError?.response?.status,
+        url: requestError?.config?.url,
+        method: requestError?.config?.method,
+        params: requestError?.config?.params,
+        response: requestError?.response?.data,
         message: getRequestErrorMessage(
           error,
           "Could not load today's gate check-ins.",
+        ),
+      });
+      showToast({
+        message: getRequestErrorMessage(
+          error,
+          requestStage === "student directory lookup"
+            ? "The gate check-ins loaded, but student admission numbers could not be loaded."
+            : "Could not load today's gate check-ins.",
         ),
         type: "error",
       });
@@ -823,9 +962,7 @@ export default function AttendanceScreen() {
         className: student.classInfo?.classCode,
       }));
       setManualStudents(students);
-      setPresentIds(
-        AttendanceService.getManualAttendance(classId)?.studentIds ?? [],
-      );
+      setPresentIds(manualAttendanceByClass.get(classId) ?? []);
     } catch (error) {
       setManualStudents([]);
       showToast({
@@ -847,15 +984,79 @@ export default function AttendanceScreen() {
     );
   const saveManual = async () => {
     if (!selectedClassId) return;
+    const studentsWithoutAdmissionNumbers = manualStudents.filter(
+      (student) => !student.admissionNumber?.trim(),
+    );
+    if (studentsWithoutAdmissionNumbers.length > 0) {
+      showToast({
+        message: `Attendance was not sent because ${studentsWithoutAdmissionNumbers.length} student${studentsWithoutAdmissionNumbers.length === 1 ? " is" : "s are"} missing an admission number.`,
+        type: "error",
+      });
+      return;
+    }
     setLoading(true);
     try {
-      await AttendanceService.saveManualAttendance(selectedClassId, presentIds);
+      const requestBody: BulkClassroomAttendanceRequest = {
+        classId: selectedClassId,
+        // Send the complete class roster: checked students are Present and
+        // every unchecked student is explicitly recorded as Absent.
+        students: manualStudents.map((student) => ({
+            studentAdmissionNo: student.admissionNumber!.trim(),
+            status: presentIds.includes(student.id)
+              ? ClassroomAttendanceItemStatusEnum.Present
+              : ClassroomAttendanceItemStatusEnum.Absent,
+          })),
+      };
+      console.log("[Record Classroom Attendance API] Request", {
+        method: "POST",
+        baseUrl: API_BASE_URL,
+        path: "/api/Attendance/students/classroom",
+        rosterCount: requestBody.students?.length ?? 0,
+        presentCount: requestBody.students?.filter(
+          (student) =>
+            student.status === ClassroomAttendanceItemStatusEnum.Present,
+        ).length ?? 0,
+        absentCount: requestBody.students?.filter(
+          (student) =>
+            student.status === ClassroomAttendanceItemStatusEnum.Absent,
+        ).length ?? 0,
+        body: requestBody,
+      });
+      const response = await attendanceApi.recordClassroomAttendance({
+        bulkClassroomAttendanceRequest: requestBody,
+      });
+      console.log("[Record Classroom Attendance API] Response", {
+        httpStatus: response.status,
+        data: response.data,
+      });
+      if (response.data.success !== true) {
+        console.error("[Record Classroom Attendance API] API error", {
+          httpStatus: response.status,
+          data: response.data,
+          request: requestBody,
+        });
+        throw new Error(
+          getApiErrorMessage(response.data, "Could not save attendance."),
+        );
+      }
+      manualAttendanceByClass.set(selectedClassId, [...presentIds]);
       setManualMode(false);
       showToast({
         message: `Attendance saved for ${presentIds.length} student${presentIds.length === 1 ? "" : "s"}.`,
         type: "success",
       });
     } catch (error) {
+      const requestError = error as any;
+      console.error("[Record Classroom Attendance API] Request failed", {
+        httpStatus: requestError?.response?.status,
+        url: requestError?.config?.url,
+        method: requestError?.config?.method,
+        response: requestError?.response?.data,
+        message: getRequestErrorMessage(
+          error,
+          "Could not save attendance. Please try again.",
+        ),
+      });
       showToast({
         message: getRequestErrorMessage(
           error,
@@ -869,16 +1070,8 @@ export default function AttendanceScreen() {
   };
   const copy =
     success?.action === "check_in"
-      ? [
-          "Check-In Successful",
-          "Your attendance has been recorded successfully.",
-        ]
-      : success?.action === "check_out_day"
-        ? ["Checked Out Successfully", "Have a safe trip home."]
-        : [
-            "Temporary Check-Out Recorded",
-            "Remember to check back in when you return to school.",
-          ];
+      ? ["Check-In Successful"]
+      : ["Check-Out Successful"];
 
   if (manualMode)
     return (
@@ -907,11 +1100,14 @@ export default function AttendanceScreen() {
       <ScanOnlyView
         insets={insets}
         loadingAssignment={assignmentLoading}
+        canLoadSchoolEventOptions={isAdmin || isTeacher}
         scannerOpen={scannerOpen}
+        scannerError={scannerError}
         loading={loading}
         checkoutOpen={checkoutOpen}
         success={success}
         student={scannedStudent}
+        termId={user?.currentTermId ?? "2"}
         option={option}
         reason={reason}
         otherReason={otherReason}
@@ -920,8 +1116,14 @@ export default function AttendanceScreen() {
         showManualAction={isTeacher && hasClassAssignment}
         onManual={enterManual}
         onScan={openScanner}
-        onCloseScanner={() => !loading && setScannerOpen(false)}
+        onCloseScanner={() => {
+          if (!loading) {
+            setScannerOpen(false);
+            setScannerError(null);
+          }
+        }}
         onBarcode={scan}
+        onDismissScannerError={() => setScannerError(null)}
         onCameraMountError={(message: string) => {
           setScannerOpen(false);
           showToast({ message, type: "error" });
@@ -1047,10 +1249,17 @@ export default function AttendanceScreen() {
       </View>
       <ScannerModal
         visible={scannerOpen}
+        errorMessage={scannerError}
         loading={loading}
         insetTop={insets.top}
-        onClose={() => !loading && setScannerOpen(false)}
+        onClose={() => {
+          if (!loading) {
+            setScannerOpen(false);
+            setScannerError(null);
+          }
+        }}
         onScan={scan}
+        onDismissError={() => setScannerError(null)}
         onMountError={(message: string) => {
           setScannerOpen(false);
           showToast({ message, type: "error" });
@@ -1061,6 +1270,8 @@ export default function AttendanceScreen() {
         loading={loading}
         insetBottom={insets.bottom}
         student={scannedStudent}
+        termId={user?.currentTermId ?? "2"}
+        canLoadSchoolEventOptions={isAdmin || isTeacher}
         option={option}
         reason={reason}
         otherReason={otherReason}
@@ -1225,11 +1436,14 @@ function ManualMarkingView({
 function ScanOnlyView({
   insets,
   loadingAssignment,
+  canLoadSchoolEventOptions,
   scannerOpen,
+  scannerError,
   loading,
   checkoutOpen,
   success,
   student,
+  termId,
   option,
   reason,
   otherReason,
@@ -1240,6 +1454,7 @@ function ScanOnlyView({
   onScan,
   onCloseScanner,
   onBarcode,
+  onDismissScannerError,
   onCameraMountError,
   onCloseCheckout,
   onOption,
@@ -1251,16 +1466,8 @@ function ScanOnlyView({
 }: any) {
   const copy =
     success?.action === "check_in"
-      ? [
-          "Check-In Successful",
-          "Your attendance has been recorded successfully.",
-        ]
-      : success?.action === "check_out_day"
-        ? ["Checked Out Successfully", "Have a safe trip home."]
-        : [
-            "Temporary Check-Out Recorded",
-            "Remember to check back in when you return to school.",
-          ];
+      ? ["Check-In Successful"]
+      : ["Check-Out Successful"];
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" translucent />
@@ -1308,10 +1515,12 @@ function ScanOnlyView({
       </View>
       <ScannerModal
         visible={scannerOpen}
+        errorMessage={scannerError}
         loading={loading}
         insetTop={insets.top}
         onClose={onCloseScanner}
         onScan={onBarcode}
+        onDismissError={onDismissScannerError}
         onMountError={onCameraMountError}
       />
       <CheckoutModal
@@ -1319,6 +1528,8 @@ function ScanOnlyView({
         loading={loading}
         insetBottom={insets.bottom}
         student={student}
+        termId={termId}
+        canLoadSchoolEventOptions={canLoadSchoolEventOptions}
         option={option}
         reason={reason}
         otherReason={otherReason}
@@ -1336,23 +1547,24 @@ function ScanOnlyView({
   );
 }
 function PersonCard({ person }: { person: Person }) {
+  const displayName = formatPersonName(person.name);
   return (
     <View style={styles.card}>
       <View style={styles.avatar}>
-        <Text style={styles.avatarText}>{person.name.charAt(0)}</Text>
+        <Text style={styles.avatarText}>{displayName.charAt(0)}</Text>
       </View>
       <View style={styles.cardText}>
-        <Text style={styles.userName}>{person.name}</Text>
-        <Text style={styles.userId}>{person.admissionNumber ?? person.id}</Text>
+        <Text style={styles.userName}>{displayName}</Text>
+        <Text style={styles.userId}>
+          {person.admissionNumber || "Admission number unavailable"}
+        </Text>
       </View>
       {typeof person.isInSchool === "boolean" && (
         <View
-          style={{
-            width: 12,
-            height: 12,
-            borderRadius: 6,
-            backgroundColor: person.isInSchool ? "#22C55E" : "#EF4444",
-          }}
+          style={[
+            styles.attendanceDot,
+            { backgroundColor: person.isInSchool ? "#22C55E" : "#EF4444" },
+          ]}
         />
       )}
       {person.className && (
@@ -1398,10 +1610,12 @@ function DialAction({ icon, label, progress, offset, onPress }: any) {
 }
 function ScannerModal({
   visible,
+  errorMessage,
   loading,
   insetTop,
   onClose,
   onScan,
+  onDismissError,
   onMountError,
 }: any) {
   return (
@@ -1426,6 +1640,19 @@ function ScannerModal({
         />
         <View style={styles.cameraShade}>
           <View style={styles.viewfinder} />
+          {errorMessage ? (
+            <View style={styles.scannerErrorToast}>
+              <Text style={styles.scannerErrorText}>{errorMessage}</Text>
+              <Pressable
+                onPress={onDismissError}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel="Dismiss camera error"
+              >
+                <Ionicons name="close" size={20} color="#64748B" />
+              </Pressable>
+            </View>
+          ) : null}
           <TouchableOpacity
             style={[styles.close, { top: insetTop + 20 }]}
             onPress={onClose}
@@ -1451,6 +1678,8 @@ function CheckoutModal({
   loading,
   insetBottom,
   student,
+  termId,
+  canLoadSchoolEventOptions,
   reason,
   otherReason,
   canSubmit,
@@ -1460,7 +1689,10 @@ function CheckoutModal({
   onSubmit,
 }: any) {
   const [eventDialogOpen, setEventDialogOpen] = useState(false);
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
   const [eventLoading, setEventLoading] = useState(false);
+  const [eventOptionsLoaded, setEventOptionsLoaded] = useState(false);
+  const [eventError, setEventError] = useState<string | null>(null);
   const [events, setEvents] = useState<{ id: string; label: string }[]>([]);
   const [supervisors, setSupervisors] = useState<
     { id: string; label: string }[]
@@ -1469,14 +1701,94 @@ function CheckoutModal({
   const [supervisorId, setSupervisorId] = useState<string | null>(null);
   const [eventMenuOpen, setEventMenuOpen] = useState(false);
   const [supervisorMenuOpen, setSupervisorMenuOpen] = useState(false);
-  const openSchoolEvent = async () => {
-    setEventDialogOpen(true);
+  const eventOptionsRequestStarted = useRef(false);
+  useEffect(() => {
+    const showEvent =
+      Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
+    const hideEvent =
+      Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
+    const showSubscription = Keyboard.addListener(showEvent, () =>
+      setKeyboardVisible(true),
+    );
+    const hideSubscription = Keyboard.addListener(hideEvent, () =>
+      setKeyboardVisible(false),
+    );
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
+    };
+  }, []);
+  const dismissKeyboardOrClose = () => {
+    if (keyboardVisible) Keyboard.dismiss();
+    else onClose();
+  };
+  const loadSchoolEventOptions = async () => {
+    if (!canLoadSchoolEventOptions) return;
+    if (
+      eventLoading ||
+      eventOptionsLoaded ||
+      eventOptionsRequestStarted.current
+    ) return;
+    eventOptionsRequestStarted.current = true;
     setEventLoading(true);
+    setEventError(null);
     try {
-      const [eventResponse, staffResponse] = await Promise.all([
-        termsApi.getTermActivities({ termId: "2", pageSize: 100 }),
+      console.log("[School Event Picker] Loading current term and staff", {
+        currentTermEndpoint: "/api/v1/AcademicSessions/current",
+        staffEndpoint: "/api/v1/staffs",
+      });
+      const [sessionResponse, staffResponse] = await Promise.all([
+        academicSessionsApi.getCurrentAcademicSession(),
         staffsApi.getStaffs({ pageSize: 100 }),
       ]);
+      console.log("[School Event Picker] Current term/staff responses", {
+        sessionStatus: sessionResponse.status,
+        session: sessionResponse.data,
+        staffStatus: staffResponse.status,
+        staff: staffResponse.data,
+      });
+      if (sessionResponse.data.success === false || staffResponse.data.success === false) {
+        throw new Error(
+          sessionResponse.data.message ||
+            staffResponse.data.message ||
+            "Could not load the current term and staff list.",
+        );
+      }
+      const currentTermId = sessionResponse.data.data?.terms?.find(
+        (term) => term.isCurrent,
+      )?.id;
+      // AuthContext can contain a display placeholder like "2"; the activities
+      // endpoint requires the real current-term identifier.
+      const resolvedTermId = currentTermId ||
+        (termId && !/^\d+$/.test(termId) ? termId : undefined);
+      if (!resolvedTermId) {
+        throw new Error("Could not find the current term for school events.");
+      }
+      console.log("[School Event Picker] Activities request", {
+        method: "GET",
+        baseUrl: API_BASE_URL,
+        path: `/api/v1/Terms/terms/${encodeURIComponent(resolvedTermId)}/activities`,
+        params: {
+          filter: GetTermActivitiesFilterEnum.All,
+          pageNumber: 1,
+          pageSize: 100,
+        },
+      });
+      const eventResponse = await termsApi.getTermActivities({
+        termId: resolvedTermId,
+        filter: GetTermActivitiesFilterEnum.All,
+        pageNumber: 1,
+        pageSize: 100,
+      });
+      console.log("[School Event Picker] Activities response", {
+        httpStatus: eventResponse.status,
+        data: eventResponse.data,
+      });
+      if (eventResponse.data.success === false) {
+        throw new Error(
+          eventResponse.data.message || "Could not load school events.",
+        );
+      }
       setEvents(
         (eventResponse.data.items ?? [])
           .map((event: any) => ({
@@ -1496,27 +1808,84 @@ function CheckoutModal({
           }))
           .filter((staff) => staff.id),
       );
+      setEventOptionsLoaded(true);
+    } catch (error) {
+      const message = getRequestErrorMessage(
+        error,
+        "Could not load school events and staff.",
+      );
+      const requestError = error as any;
+      console.error("[School Event Picker] Load failed", {
+        httpStatus: requestError?.response?.status,
+        url: requestError?.config?.url,
+        response: requestError?.response?.data,
+        message,
+      });
+      setEventError(message);
     } finally {
+      eventOptionsRequestStarted.current = false;
       setEventLoading(false);
     }
+  };
+  useEffect(() => {
+    // CheckoutModal is rendered only for authorized attendance users (admins
+    // and teachers), so load both selector lists ahead of the user's tap.
+    if (canLoadSchoolEventOptions) void loadSchoolEventOptions();
+  }, [termId, canLoadSchoolEventOptions]);
+  const openSchoolEvent = () => {
+    Keyboard.dismiss();
+    if (reason !== RecordGateAttendanceRequestGateReasonEnum.SchoolEvent) {
+      setEventId(null);
+      setSupervisorId(null);
+    }
+    onReason(RecordGateAttendanceRequestGateReasonEnum.SchoolEvent);
+    setEventDialogOpen(true);
+    if (!eventOptionsLoaded && !eventLoading) void loadSchoolEventOptions();
+  };
+  const retrySchoolEventOptions = () => {
+    setEventError(null);
+    setEventOptionsLoaded(false);
+    eventOptionsRequestStarted.current = false;
+    void loadSchoolEventOptions();
   };
   const selectedEvent = events.find((event) => event.id === eventId);
   const selectedSupervisor = supervisors.find(
     (supervisor) => supervisor.id === supervisorId,
   );
+  const canSubmitCheckout =
+    canSubmit &&
+    (reason !== RecordGateAttendanceRequestGateReasonEnum.SchoolEvent ||
+      (Boolean(selectedEvent) && Boolean(selectedSupervisor)));
   return (
     <>
       <Modal
         visible={visible}
         transparent
         animationType="slide"
-        onRequestClose={onClose}
+        onRequestClose={() =>
+          eventDialogOpen ? setEventDialogOpen(false) : onClose()
+        }
       >
         <View style={styles.overlay}>
-          <Pressable style={styles.dismiss} onPress={onClose} hitSlop={12} />
+          <Pressable
+            style={styles.dismiss}
+            onPress={dismissKeyboardOrClose}
+            hitSlop={12}
+          />
           <View
-            style={[styles.sheet, { paddingBottom: Math.max(insetBottom, 24) }]}
+            style={[
+              styles.sheet,
+              styles.keyboardSheet,
+              { paddingBottom: Math.max(insetBottom, 24) },
+            ]}
           >
+            <ScrollView
+              style={styles.checkoutScroll}
+              contentContainerStyle={styles.checkoutScrollContent}
+              keyboardDismissMode="on-drag"
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+            >
             <View style={styles.handle} />
             <Text style={styles.sheetTitle}>Leave School</Text>
             <Text
@@ -1547,35 +1916,58 @@ function CheckoutModal({
               Why is {student?.name?.split(" ")[0] ?? "this student"} leaving?
             </Text>
             <View style={{ marginBottom: 4 }}>
-              {REASONS.map((item) => (
+            {REASONS.filter(
+                (item) =>
+                  reason !== RecordGateAttendanceRequestGateReasonEnum.Other ||
+                  item.value === RecordGateAttendanceRequestGateReasonEnum.Other,
+              ).map((item) => (
                 <Choice
-                  key={item}
-                  active={
-                    reason === item ||
-                    (item === "School Event" &&
-                      reason?.startsWith("School Event:"))
-                  }
-                  title={item}
-                  onPress={() =>
-                    item === "School Event"
-                      ? void openSchoolEvent()
-                      : onReason(item)
-                  }
+                  key={item.value}
+                  active={reason === item.value}
+                  title={item.label}
+                  onPress={() => {
+                    if (
+                      item.value ===
+                      RecordGateAttendanceRequestGateReasonEnum.SchoolEvent
+                    ) {
+                      openSchoolEvent();
+                      return;
+                    }
+                    setEventId(null);
+                    setSupervisorId(null);
+                    onReason(item.value);
+                  }}
                 />
               ))}
             </View>
-            {reason === "Other" && (
+            {reason === RecordGateAttendanceRequestGateReasonEnum.SchoolEvent &&
+              (selectedEvent || selectedSupervisor) && (
+                <Text style={styles.eventSelectionSummary}>
+                  {[selectedEvent?.label, selectedSupervisor?.label]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </Text>
+              )}
+            {reason === RecordGateAttendanceRequestGateReasonEnum.Other && (
               <TextInput
-                style={styles.input}
+                style={styles.reasonTextArea}
                 placeholder="Enter reason"
                 value={otherReason}
                 onChangeText={onOther}
+                multiline
+                textAlignVertical="top"
+                numberOfLines={4}
               />
             )}
             <TouchableOpacity
-              style={[styles.doneButton, !canSubmit && styles.disabled]}
-              disabled={!canSubmit || loading}
-              onPress={onSubmit}
+              style={[styles.doneButton, !canSubmitCheckout && styles.disabled]}
+              disabled={!canSubmitCheckout || loading}
+              onPress={() =>
+                onSubmit({
+                  schoolEventId: eventId ?? undefined,
+                  approvedByStaffId: supervisorId ?? undefined,
+                })
+              }
             >
               {loading ? (
                 <ActivityIndicator color="#FFF" />
@@ -1583,44 +1975,46 @@ function CheckoutModal({
                 <Text style={styles.doneButtonText}>Confirm Leave School</Text>
               )}
             </TouchableOpacity>
+            </ScrollView>
           </View>
         </View>
+        <SchoolEventModal
+          visible={eventDialogOpen}
+          loading={eventLoading}
+          error={eventError}
+          events={events}
+          supervisors={supervisors}
+          eventId={eventId}
+          supervisorId={supervisorId}
+          eventMenuOpen={eventMenuOpen}
+          supervisorMenuOpen={supervisorMenuOpen}
+          onClose={() => setEventDialogOpen(false)}
+          onRetry={retrySchoolEventOptions}
+          onEventMenu={() => setEventMenuOpen(!eventMenuOpen)}
+          onSupervisorMenu={() => setSupervisorMenuOpen(!supervisorMenuOpen)}
+          onEvent={(id: string) => {
+            setEventId(id);
+            setEventMenuOpen(false);
+          }}
+          onSupervisor={(id: string) => {
+            setSupervisorId(id);
+            setSupervisorMenuOpen(false);
+          }}
+          onConfirm={() => {
+            if (selectedEvent && selectedSupervisor) {
+              onReason(RecordGateAttendanceRequestGateReasonEnum.SchoolEvent);
+              setEventDialogOpen(false);
+            }
+          }}
+        />
       </Modal>
-      <SchoolEventModal
-        visible={eventDialogOpen}
-        loading={eventLoading}
-        events={events}
-        supervisors={supervisors}
-        eventId={eventId}
-        supervisorId={supervisorId}
-        eventMenuOpen={eventMenuOpen}
-        supervisorMenuOpen={supervisorMenuOpen}
-        onClose={() => setEventDialogOpen(false)}
-        onEventMenu={() => setEventMenuOpen(!eventMenuOpen)}
-        onSupervisorMenu={() => setSupervisorMenuOpen(!supervisorMenuOpen)}
-        onEvent={(id: string) => {
-          setEventId(id);
-          setEventMenuOpen(false);
-        }}
-        onSupervisor={(id: string) => {
-          setSupervisorId(id);
-          setSupervisorMenuOpen(false);
-        }}
-        onConfirm={() => {
-          if (selectedEvent && selectedSupervisor) {
-            onReason(
-              `School Event: ${selectedEvent.label} — Supervisor: ${selectedSupervisor.label}`,
-            );
-            setEventDialogOpen(false);
-          }
-        }}
-      />
     </>
   );
 }
 function SchoolEventModal({
   visible,
   loading,
+  error,
   events,
   supervisors,
   eventId,
@@ -1628,6 +2022,7 @@ function SchoolEventModal({
   eventMenuOpen,
   supervisorMenuOpen,
   onClose,
+  onRetry,
   onEventMenu,
   onSupervisorMenu,
   onEvent,
@@ -1636,16 +2031,11 @@ function SchoolEventModal({
 }: any) {
   const event = events.find((item: any) => item.id === eventId);
   const supervisor = supervisors.find((item: any) => item.id === supervisorId);
+  if (!visible) return null;
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="slide"
-      onRequestClose={onClose}
-    >
-      <View style={styles.overlay}>
+      <View style={[styles.overlay, styles.eventModalOverlay]}>
         <Pressable style={styles.dismiss} onPress={onClose} />
-        <View style={styles.sheet}>
+        <View style={[styles.sheet, styles.keyboardSheet]}>
           <View style={styles.handle} />
           <Text style={styles.sheetTitle}>School Event Details</Text>
           <Text style={styles.sheetSub}>
@@ -1656,6 +2046,16 @@ function SchoolEventModal({
               color={COLORS.primary}
               style={{ marginVertical: 28 }}
             />
+          ) : error ? (
+            <View style={styles.eventErrorState}>
+              <Text style={styles.eventErrorText}>{error}</Text>
+              <TouchableOpacity
+                style={styles.eventRetryButton}
+                onPress={onRetry}
+              >
+                <Text style={styles.eventRetryText}>Try again</Text>
+              </TouchableOpacity>
+            </View>
           ) : (
             <>
               <Text style={styles.classLabel}>Event</Text>
@@ -1726,7 +2126,6 @@ function SchoolEventModal({
           )}
         </View>
       </View>
-    </Modal>
   );
 }
 function Choice({ active, title, description, onPress }: any) {
@@ -1740,7 +2139,9 @@ function Choice({ active, title, description, onPress }: any) {
       </View>
       <View style={styles.cardText}>
         <Text style={styles.choiceTitle}>{title}</Text>
-        <Text style={styles.choiceSub}>{description}</Text>
+        {description ? (
+          <Text style={styles.choiceSub}>{description}</Text>
+        ) : null}
       </View>
     </TouchableOpacity>
   );
@@ -1754,10 +2155,6 @@ function SuccessModal({ success, copy, onDone }: any) {
             <Ionicons name="checkmark" size={42} color="#FFF" />
           </View>
           <Text style={styles.successTitle}>{copy[0]}</Text>
-          <Text style={styles.successBody}>{copy[1]}</Text>
-          {success?.reason && (
-            <Text style={styles.reasonText}>Reason: {success.reason}</Text>
-          )}
           <Text style={styles.timeText}>
             {success?.action === "check_in" ? "Check-in" : "Check-out"} time:{" "}
             {success?.timestamp.toLocaleTimeString([], {
@@ -1765,7 +2162,13 @@ function SuccessModal({ success, copy, onDone }: any) {
               minute: "2-digit",
             })}
           </Text>
-          <TouchableOpacity style={styles.doneButton} onPress={onDone}>
+          {success?.action === "check_out" && success?.reason ? (
+            <Text style={styles.successReason}>Reason: {success.reason}</Text>
+          ) : null}
+          <TouchableOpacity
+            style={[styles.doneButton, styles.successDoneButton]}
+            onPress={onDone}
+          >
             <Text style={styles.doneButtonText}>Done</Text>
           </TouchableOpacity>
         </View>
@@ -1959,6 +2362,13 @@ const styles = StyleSheet.create({
     marginTop: 2,
     fontFamily: "Lexend",
   },
+  attendanceDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    alignSelf: "flex-start",
+    marginTop: 7,
+  },
   badge: {
     backgroundColor: "#DAE2FF",
     paddingHorizontal: 10,
@@ -2094,6 +2504,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     marginVertical: 20,
+    paddingHorizontal: 20,
+  },
+  successDoneButton: {
+    width: "100%",
+    maxWidth: 240,
+    marginTop: 16,
+    marginBottom: 0,
   },
   doneButtonText: {
     color: "#FFF",
@@ -2139,6 +2556,29 @@ const styles = StyleSheet.create({
     borderColor: "#FFF",
     borderRadius: 16,
   },
+  scannerErrorToast: {
+    position: "absolute",
+    top: 20,
+    left: 16,
+    right: 16,
+    zIndex: 2,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 12,
+    padding: 14,
+    borderRadius: 12,
+    backgroundColor: "#FFFFFF",
+    borderLeftWidth: 4,
+    borderLeftColor: "#EF4444",
+    elevation: 8,
+  },
+  scannerErrorText: {
+    flex: 1,
+    color: "#1F2937",
+    fontSize: 14,
+    lineHeight: 20,
+    fontFamily: "Lexend",
+  },
   close: {
     position: "absolute",
     right: 20,
@@ -2172,6 +2612,15 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(0,0,0,.4)",
     justifyContent: "flex-end",
   },
+  eventModalOverlay: {
+    position: "absolute",
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    zIndex: 10,
+    elevation: 10,
+  },
   dismiss: { flex: 1 },
   sheet: {
     backgroundColor: "#FFF",
@@ -2179,6 +2628,16 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
+  },
+  keyboardSheet: {
+    width: "100%",
+    maxHeight: "92%",
+  },
+  checkoutScroll: {
+    flexShrink: 1,
+  },
+  checkoutScrollContent: {
+    paddingBottom: 8,
   },
   handle: {
     width: 42,
@@ -2256,6 +2715,18 @@ const styles = StyleSheet.create({
     color: "#0F172A",
     fontFamily: "Lexend",
   },
+  reasonTextArea: {
+    marginTop: 12,
+    minHeight: 120,
+    maxHeight: 180,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#CBD5E1",
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    color: "#0F172A",
+    fontFamily: "Lexend",
+  },
   successOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,.46)",
@@ -2265,33 +2736,26 @@ const styles = StyleSheet.create({
   },
   success: {
     width: "100%",
-    maxWidth: 380,
+    maxWidth: 360,
     backgroundColor: "#FFF",
-    borderRadius: 24,
-    padding: 28,
+    borderRadius: 22,
+    paddingHorizontal: 24,
+    paddingVertical: 20,
     alignItems: "center",
   },
   successIcon: {
-    width: 76,
-    height: 76,
-    borderRadius: 38,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: COLORS.statusCompleted,
-    marginBottom: 20,
+    marginBottom: 12,
   },
   successTitle: {
     fontSize: 21,
     fontWeight: "700",
     color: "#0F172A",
-    fontFamily: "Lexend",
-    textAlign: "center",
-  },
-  successBody: {
-    marginTop: 10,
-    fontSize: 14,
-    lineHeight: 21,
-    color: "#64748B",
     fontFamily: "Lexend",
     textAlign: "center",
   },
@@ -2301,5 +2765,40 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     fontFamily: "Lexend",
   },
-  timeText: { marginTop: 16, color: "#64748B", fontFamily: "Lexend" },
+  timeText: { marginTop: 12, color: "#64748B", fontFamily: "Lexend" },
+  eventSelectionSummary: {
+    color: "#64748B",
+    fontSize: 13,
+    marginBottom: 12,
+    fontFamily: "Lexend",
+  },
+  eventErrorState: {
+    alignItems: "center",
+    paddingVertical: 20,
+  },
+  eventErrorText: {
+    color: "#B91C1C",
+    fontSize: 14,
+    textAlign: "center",
+    fontFamily: "Lexend",
+  },
+  eventRetryButton: {
+    marginTop: 14,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    borderRadius: 10,
+    backgroundColor: COLORS.primary,
+  },
+  eventRetryText: {
+    color: "#FFFFFF",
+    fontWeight: "600",
+    fontFamily: "Lexend",
+  },
+  successReason: {
+    marginTop: 8,
+    color: "#475569",
+    fontSize: 14,
+    textAlign: "center",
+    fontFamily: "Lexend",
+  },
 });

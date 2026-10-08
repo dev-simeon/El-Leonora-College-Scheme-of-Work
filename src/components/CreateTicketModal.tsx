@@ -1,14 +1,15 @@
 import { useState } from "react";
 import {
   View,
-  Text,
+  Text as NativeText,
   StyleSheet,
   Modal,
   TouchableOpacity,
-  TextInput,
+  TextInput as NativeTextInput,
   ScrollView,
   Platform,
 } from "react-native";
+import { LexendText as Text, LexendTextInput as TextInput } from "./LexendText";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Path } from "react-native-svg";
 import { COLORS } from "../constants/colors";

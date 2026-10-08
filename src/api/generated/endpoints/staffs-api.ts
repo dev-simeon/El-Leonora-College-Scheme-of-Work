@@ -451,6 +451,54 @@ export const StaffsApiAxiosParamCreator = function (configuration?: Configuratio
         },
         /**
          * 
+         * @param {File} profileImage 
+         * @param {string} id 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        updateProfilePicture: async (profileImage: File, id: string, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'profileImage' is not null or undefined
+            assertParamExists('updateProfilePicture', 'profileImage', profileImage)
+            // verify required parameter 'id' is not null or undefined
+            assertParamExists('updateProfilePicture', 'id', id)
+            const localVarPath = `/api/v1/staffs/{id}/profile-picture`
+                .replace(`{${"id"}}`, encodeURIComponent(String(id)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'PUT', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+            const localVarFormParams = new ((configuration && configuration.formDataCtor) || FormData)();
+
+            // authentication Bearer required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+
+            if (profileImage !== undefined) { 
+                localVarFormParams.append('ProfileImage', profileImage as any);
+            }
+    
+    
+            localVarHeaderParameter['Content-Type'] = 'multipart/form-data';
+    
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = localVarFormParams;
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
          * @param {string} id 
          * @param {UpdateStaffDto} [updateStaffDto] 
          * @param {*} [options] Override http request option.
@@ -629,6 +677,19 @@ export const StaffsApiFp = function(configuration?: Configuration) {
         },
         /**
          * 
+         * @param {File} profileImage 
+         * @param {string} id 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async updateProfilePicture(profileImage: File, id: string, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<NoDataResponseDtoApiResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.updateProfilePicture(profileImage, id, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['StaffsApi.updateProfilePicture']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
          * @param {string} id 
          * @param {UpdateStaffDto} [updateStaffDto] 
          * @param {*} [options] Override http request option.
@@ -739,6 +800,15 @@ export const StaffsApiFactory = function (configuration?: Configuration, basePat
          */
         resetStaffPassword(requestParameters: StaffsApiResetStaffPasswordRequest, options?: RawAxiosRequestConfig): AxiosPromise<NoDataResponseDtoApiResponse> {
             return localVarFp.resetStaffPassword(requestParameters.id, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @param {StaffsApiUpdateProfilePictureRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        updateProfilePicture(requestParameters: StaffsApiUpdateProfilePictureRequest, options?: RawAxiosRequestConfig): AxiosPromise<NoDataResponseDtoApiResponse> {
+            return localVarFp.updateProfilePicture(requestParameters.profileImage, requestParameters.id, options).then((request) => request(axios, basePath));
         },
         /**
          * 
@@ -942,6 +1012,27 @@ export interface StaffsApiResetStaffPasswordRequest {
 }
 
 /**
+ * Request parameters for updateProfilePicture operation in StaffsApi.
+ * @export
+ * @interface StaffsApiUpdateProfilePictureRequest
+ */
+export interface StaffsApiUpdateProfilePictureRequest {
+    /**
+     * 
+     * @type {File}
+     * @memberof StaffsApiUpdateProfilePicture
+     */
+    readonly profileImage: File
+
+    /**
+     * 
+     * @type {string}
+     * @memberof StaffsApiUpdateProfilePicture
+     */
+    readonly id: string
+}
+
+/**
  * Request parameters for updateStaff operation in StaffsApi.
  * @export
  * @interface StaffsApiUpdateStaffRequest
@@ -1077,6 +1168,17 @@ export class StaffsApi extends BaseAPI {
      */
     public resetStaffPassword(requestParameters: StaffsApiResetStaffPasswordRequest, options?: RawAxiosRequestConfig) {
         return StaffsApiFp(this.configuration).resetStaffPassword(requestParameters.id, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @param {StaffsApiUpdateProfilePictureRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof StaffsApi
+     */
+    public updateProfilePicture(requestParameters: StaffsApiUpdateProfilePictureRequest, options?: RawAxiosRequestConfig) {
+        return StaffsApiFp(this.configuration).updateProfilePicture(requestParameters.profileImage, requestParameters.id, options).then((request) => request(this.axios, this.basePath));
     }
 
     /**

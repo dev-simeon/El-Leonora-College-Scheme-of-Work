@@ -17,28 +17,28 @@
 /**
  * 
  * @export
- * @interface RecordStudentAttendanceRequest
+ * @interface ClassroomAttendanceItem
  */
-export interface RecordStudentAttendanceRequest {
+export interface ClassroomAttendanceItem {
     /**
      * 
      * @type {string}
-     * @memberof RecordStudentAttendanceRequest
+     * @memberof ClassroomAttendanceItem
      */
     'studentAdmissionNo'?: string;
     /**
      * 
      * @type {string}
-     * @memberof RecordStudentAttendanceRequest
+     * @memberof ClassroomAttendanceItem
      */
-    'attendanceStatus'?: RecordStudentAttendanceRequestAttendanceStatusEnum;
+    'status'?: ClassroomAttendanceItemStatusEnum;
 }
 
 /**
     * @export
     * @enum {string}
     */
-export enum RecordStudentAttendanceRequestAttendanceStatusEnum {
+export enum ClassroomAttendanceItemStatusEnum {
     Present = 'Present',
     Absent = 'Absent',
     Late = 'Late',

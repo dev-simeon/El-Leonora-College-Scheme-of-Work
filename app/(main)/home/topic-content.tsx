@@ -1,7 +1,7 @@
 import React, { useEffect } from "react";
 import {
   View,
-  Text,
+  Text as NativeText,
   StyleSheet,
   ScrollView,
   Pressable,
@@ -9,6 +9,7 @@ import {
   RefreshControl,
   useWindowDimensions,
 } from "react-native";
+import { LexendText as Text } from "../../../src/components/LexendText";
 import { useQuery } from "@tanstack/react-query";
 import { StatusBar } from "expo-status-bar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";

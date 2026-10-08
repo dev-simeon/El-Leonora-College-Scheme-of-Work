@@ -1,11 +1,12 @@
 import React from "react";
 import {
   View,
-  Text,
+  Text as NativeText,
   TouchableOpacity,
   StyleSheet,
   Platform,
 } from "react-native";
+import { LexendText as Text } from "./LexendText";
 import { BottomTabBarProps } from "expo-router/js-tabs";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Path } from "react-native-svg";

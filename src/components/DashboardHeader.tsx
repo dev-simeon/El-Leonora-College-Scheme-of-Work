@@ -1,12 +1,13 @@
 import React from "react";
 import {
   View,
-  Text,
+  Text as NativeText,
   Image,
   StyleSheet,
   TouchableOpacity,
   Platform,
 } from "react-native";
+import { LexendText as Text } from "./LexendText";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";

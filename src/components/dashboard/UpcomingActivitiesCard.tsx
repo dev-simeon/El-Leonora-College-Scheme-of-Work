@@ -1,5 +1,6 @@
 import React from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text as NativeText, View } from "react-native";
+import { LexendText as Text } from "../LexendText";
 import { useQuery } from "@tanstack/react-query";
 import {
   TermsApi,

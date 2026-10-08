@@ -1,5 +1,6 @@
 import React from "react";
-import { View, Text, StyleSheet, TouchableOpacity, Image } from "react-native";
+import { View, Text as NativeText, StyleSheet, TouchableOpacity, Image } from "react-native";
+import { LexendText as Text } from "./LexendText";
 import { COLORS } from "../constants/colors";
 
 interface SubjectCardProps {

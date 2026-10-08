@@ -67,6 +67,12 @@ export interface StaffDetailDto {
     'gender'?: StaffDetailDtoGenderEnum;
     /**
      * 
+     * @type {string}
+     * @memberof StaffDetailDto
+     */
+    'profileImageUrl'?: string;
+    /**
+     * 
      * @type {boolean}
      * @memberof StaffDetailDto
      */

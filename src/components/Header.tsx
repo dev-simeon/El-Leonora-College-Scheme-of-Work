@@ -1,5 +1,6 @@
 import React from "react";
-import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import { View, Text as NativeText, TouchableOpacity, StyleSheet } from "react-native";
+import { LexendText as Text } from "./LexendText";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { COLORS } from "../constants/colors";
 import { SPACING } from "../constants/spacing";

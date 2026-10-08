@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import {
   View,
-  Text,
+  Text as NativeText,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
@@ -9,7 +9,9 @@ import {
   Pressable,
   RefreshControl,
   Modal,
+  Image,
 } from "react-native";
+import { LexendText as Text } from "../../../src/components/LexendText";
 import QRCode from "react-native-qrcode-svg";
 import { useQuery } from "@tanstack/react-query";
 import { useIsFocused } from "expo-router/react-navigation";
@@ -36,6 +38,7 @@ import type {
   BasicSchoolUserProfileDto,
   SubjectInfoDto,
 } from "../../../src/api/generated/models";
+import { useProfileImageUrl } from "../../../src/hooks/useProfileImageUrl";
 
 // ─── API Clients ──────────────────────────────────────────────────────────────
 const accountApi = new AccountApi(
@@ -122,6 +125,7 @@ export default function SettingsScreen() {
   const isFocused = useIsFocused();
   const { user, logout } = useAuth();
   const { showToast } = useToast();
+  const { data: profileImageUrl } = useProfileImageUrl();
 
   const [isQRVisible, setIsQRVisible] = useState(false);
 
@@ -219,7 +223,15 @@ export default function SettingsScreen() {
           {/* Avatar */}
           <View style={styles.avatarRing}>
             <View style={styles.avatarInner}>
-              <Text style={styles.avatarInitials}>{initials}</Text>
+              {profileImageUrl ? (
+                <Image
+                  source={{ uri: profileImageUrl }}
+                  style={styles.avatarPhoto}
+                  resizeMode="cover"
+                />
+              ) : (
+                <Text style={styles.avatarInitials}>{initials}</Text>
+              )}
             </View>
           </View>
 
@@ -355,15 +367,6 @@ export default function SettingsScreen() {
                 subtitle="Version info and changelog"
                 onPress={() => router.push("/(main)/settings/about")}
               />
-              <View style={styles.divider} />
-              <SettingRow
-                icon="scan-outline"
-                iconColor="#135BEC"
-                iconBg="#EFF6FF"
-                label="Safe Area Diagnostic"
-                subtitle="Inspect iOS status bar and viewport insets"
-                onPress={() => router.push("/(main)/settings/safe-area-check")}
-              />
             </View>
           </View>
 
@@ -469,6 +472,11 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     color: "#0F172A",
     letterSpacing: 1,
+  },
+  avatarPhoto: {
+    width: "100%",
+    height: "100%",
+    borderRadius: 39,
   },
   heroInfo: {
     alignItems: "center",

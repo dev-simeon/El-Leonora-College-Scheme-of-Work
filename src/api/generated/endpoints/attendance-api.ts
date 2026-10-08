@@ -22,9 +22,13 @@ import { DUMMY_BASE_URL, assertParamExists, setApiKeyToObject, setBasicAuthToObj
 // @ts-ignore
 import { BASE_PATH, COLLECTION_FORMATS, type RequestArgs, BaseAPI, RequiredError, operationServerMap } from '../base';
 // @ts-ignore
+import type { BulkClassroomAttendanceRequest } from '../models';
+// @ts-ignore
 import type { ClassroomAttendanceStudentResponseApiPagedResponse } from '../models';
 // @ts-ignore
-import type { RecordStudentAttendanceRequest } from '../models';
+import type { NoDataResponseDtoApiResponse } from '../models';
+// @ts-ignore
+import type { RecordGateAttendanceRequest } from '../models';
 // @ts-ignore
 import type { StudentStatusResponseApiResponse } from '../models';
 /**
@@ -36,7 +40,7 @@ export const AttendanceApiAxiosParamCreator = function (configuration?: Configur
         /**
          * 
          * @param {string} [classId] 
-         * @param {GetClassroomAttendanceStatusEnum} [status] 
+         * @param {GetClassroomAttendanceAttendanceStatusEnum} [attendanceStatus] 
          * @param {string} [fromDate] 
          * @param {number} [pageNumber] 
          * @param {number} [pageSize] 
@@ -44,7 +48,7 @@ export const AttendanceApiAxiosParamCreator = function (configuration?: Configur
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        getClassroomAttendance: async (classId?: string, status?: GetClassroomAttendanceStatusEnum, fromDate?: string, pageNumber?: number, pageSize?: number, search?: string, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+        getClassroomAttendance: async (classId?: string, attendanceStatus?: GetClassroomAttendanceAttendanceStatusEnum, fromDate?: string, pageNumber?: number, pageSize?: number, search?: string, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
             const localVarPath = `/api/Attendance/students`;
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
@@ -65,8 +69,8 @@ export const AttendanceApiAxiosParamCreator = function (configuration?: Configur
                 localVarQueryParameter['ClassId'] = classId;
             }
 
-            if (status !== undefined) {
-                localVarQueryParameter['Status'] = status;
+            if (attendanceStatus !== undefined) {
+                localVarQueryParameter['AttendanceStatus'] = attendanceStatus;
             }
 
             if (fromDate !== undefined) {
@@ -137,12 +141,12 @@ export const AttendanceApiAxiosParamCreator = function (configuration?: Configur
         },
         /**
          * 
-         * @param {RecordStudentAttendanceRequest} [recordStudentAttendanceRequest] 
+         * @param {BulkClassroomAttendanceRequest} [bulkClassroomAttendanceRequest] 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        recordStudentAttendance: async (recordStudentAttendanceRequest?: RecordStudentAttendanceRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
-            const localVarPath = `/api/Attendance/students`;
+        recordClassroomAttendance: async (bulkClassroomAttendanceRequest?: BulkClassroomAttendanceRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            const localVarPath = `/api/Attendance/students/classroom`;
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
             let baseOptions;
@@ -165,7 +169,44 @@ export const AttendanceApiAxiosParamCreator = function (configuration?: Configur
             setSearchParams(localVarUrlObj, localVarQueryParameter);
             let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
             localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
-            localVarRequestOptions.data = serializeDataIfNeeded(recordStudentAttendanceRequest, localVarRequestOptions, configuration)
+            localVarRequestOptions.data = serializeDataIfNeeded(bulkClassroomAttendanceRequest, localVarRequestOptions, configuration)
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @param {RecordGateAttendanceRequest} [recordGateAttendanceRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        recordGateAttendance: async (recordGateAttendanceRequest?: RecordGateAttendanceRequest, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            const localVarPath = `/api/Attendance/students/gate`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication Bearer required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+
+    
+            localVarHeaderParameter['Content-Type'] = 'application/json';
+
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = serializeDataIfNeeded(recordGateAttendanceRequest, localVarRequestOptions, configuration)
 
             return {
                 url: toPathString(localVarUrlObj),
@@ -185,7 +226,7 @@ export const AttendanceApiFp = function(configuration?: Configuration) {
         /**
          * 
          * @param {string} [classId] 
-         * @param {GetClassroomAttendanceStatusEnum} [status] 
+         * @param {GetClassroomAttendanceAttendanceStatusEnum} [attendanceStatus] 
          * @param {string} [fromDate] 
          * @param {number} [pageNumber] 
          * @param {number} [pageSize] 
@@ -193,8 +234,8 @@ export const AttendanceApiFp = function(configuration?: Configuration) {
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        async getClassroomAttendance(classId?: string, status?: GetClassroomAttendanceStatusEnum, fromDate?: string, pageNumber?: number, pageSize?: number, search?: string, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<ClassroomAttendanceStudentResponseApiPagedResponse>> {
-            const localVarAxiosArgs = await localVarAxiosParamCreator.getClassroomAttendance(classId, status, fromDate, pageNumber, pageSize, search, options);
+        async getClassroomAttendance(classId?: string, attendanceStatus?: GetClassroomAttendanceAttendanceStatusEnum, fromDate?: string, pageNumber?: number, pageSize?: number, search?: string, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<ClassroomAttendanceStudentResponseApiPagedResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.getClassroomAttendance(classId, attendanceStatus, fromDate, pageNumber, pageSize, search, options);
             const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
             const localVarOperationServerBasePath = operationServerMap['AttendanceApi.getClassroomAttendance']?.[localVarOperationServerIndex]?.url;
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
@@ -213,14 +254,26 @@ export const AttendanceApiFp = function(configuration?: Configuration) {
         },
         /**
          * 
-         * @param {RecordStudentAttendanceRequest} [recordStudentAttendanceRequest] 
+         * @param {BulkClassroomAttendanceRequest} [bulkClassroomAttendanceRequest] 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        async recordStudentAttendance(recordStudentAttendanceRequest?: RecordStudentAttendanceRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<StudentStatusResponseApiResponse>> {
-            const localVarAxiosArgs = await localVarAxiosParamCreator.recordStudentAttendance(recordStudentAttendanceRequest, options);
+        async recordClassroomAttendance(bulkClassroomAttendanceRequest?: BulkClassroomAttendanceRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<NoDataResponseDtoApiResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.recordClassroomAttendance(bulkClassroomAttendanceRequest, options);
             const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
-            const localVarOperationServerBasePath = operationServerMap['AttendanceApi.recordStudentAttendance']?.[localVarOperationServerIndex]?.url;
+            const localVarOperationServerBasePath = operationServerMap['AttendanceApi.recordClassroomAttendance']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
+         * @param {RecordGateAttendanceRequest} [recordGateAttendanceRequest] 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async recordGateAttendance(recordGateAttendanceRequest?: RecordGateAttendanceRequest, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<StudentStatusResponseApiResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.recordGateAttendance(recordGateAttendanceRequest, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['AttendanceApi.recordGateAttendance']?.[localVarOperationServerIndex]?.url;
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
     }
@@ -240,7 +293,7 @@ export const AttendanceApiFactory = function (configuration?: Configuration, bas
          * @throws {RequiredError}
          */
         getClassroomAttendance(requestParameters: AttendanceApiGetClassroomAttendanceRequest = {}, options?: RawAxiosRequestConfig): AxiosPromise<ClassroomAttendanceStudentResponseApiPagedResponse> {
-            return localVarFp.getClassroomAttendance(requestParameters.classId, requestParameters.status, requestParameters.fromDate, requestParameters.pageNumber, requestParameters.pageSize, requestParameters.search, options).then((request) => request(axios, basePath));
+            return localVarFp.getClassroomAttendance(requestParameters.classId, requestParameters.attendanceStatus, requestParameters.fromDate, requestParameters.pageNumber, requestParameters.pageSize, requestParameters.search, options).then((request) => request(axios, basePath));
         },
         /**
          * 
@@ -253,12 +306,21 @@ export const AttendanceApiFactory = function (configuration?: Configuration, bas
         },
         /**
          * 
-         * @param {AttendanceApiRecordStudentAttendanceRequest} requestParameters Request parameters.
+         * @param {AttendanceApiRecordClassroomAttendanceRequest} requestParameters Request parameters.
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        recordStudentAttendance(requestParameters: AttendanceApiRecordStudentAttendanceRequest = {}, options?: RawAxiosRequestConfig): AxiosPromise<StudentStatusResponseApiResponse> {
-            return localVarFp.recordStudentAttendance(requestParameters.recordStudentAttendanceRequest, options).then((request) => request(axios, basePath));
+        recordClassroomAttendance(requestParameters: AttendanceApiRecordClassroomAttendanceRequest = {}, options?: RawAxiosRequestConfig): AxiosPromise<NoDataResponseDtoApiResponse> {
+            return localVarFp.recordClassroomAttendance(requestParameters.bulkClassroomAttendanceRequest, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @param {AttendanceApiRecordGateAttendanceRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        recordGateAttendance(requestParameters: AttendanceApiRecordGateAttendanceRequest = {}, options?: RawAxiosRequestConfig): AxiosPromise<StudentStatusResponseApiResponse> {
+            return localVarFp.recordGateAttendance(requestParameters.recordGateAttendanceRequest, options).then((request) => request(axios, basePath));
         },
     };
 };
@@ -281,7 +343,7 @@ export interface AttendanceApiGetClassroomAttendanceRequest {
      * @type {'Present' | 'Absent' | 'Late' | 'Excused'}
      * @memberof AttendanceApiGetClassroomAttendance
      */
-    readonly status?: GetClassroomAttendanceStatusEnum
+    readonly attendanceStatus?: GetClassroomAttendanceAttendanceStatusEnum
 
     /**
      * 
@@ -327,17 +389,31 @@ export interface AttendanceApiGetStudentStatusRequest {
 }
 
 /**
- * Request parameters for recordStudentAttendance operation in AttendanceApi.
+ * Request parameters for recordClassroomAttendance operation in AttendanceApi.
  * @export
- * @interface AttendanceApiRecordStudentAttendanceRequest
+ * @interface AttendanceApiRecordClassroomAttendanceRequest
  */
-export interface AttendanceApiRecordStudentAttendanceRequest {
+export interface AttendanceApiRecordClassroomAttendanceRequest {
     /**
      * 
-     * @type {RecordStudentAttendanceRequest}
-     * @memberof AttendanceApiRecordStudentAttendance
+     * @type {BulkClassroomAttendanceRequest}
+     * @memberof AttendanceApiRecordClassroomAttendance
      */
-    readonly recordStudentAttendanceRequest?: RecordStudentAttendanceRequest
+    readonly bulkClassroomAttendanceRequest?: BulkClassroomAttendanceRequest
+}
+
+/**
+ * Request parameters for recordGateAttendance operation in AttendanceApi.
+ * @export
+ * @interface AttendanceApiRecordGateAttendanceRequest
+ */
+export interface AttendanceApiRecordGateAttendanceRequest {
+    /**
+     * 
+     * @type {RecordGateAttendanceRequest}
+     * @memberof AttendanceApiRecordGateAttendance
+     */
+    readonly recordGateAttendanceRequest?: RecordGateAttendanceRequest
 }
 
 /**
@@ -355,7 +431,7 @@ export class AttendanceApi extends BaseAPI {
      * @memberof AttendanceApi
      */
     public getClassroomAttendance(requestParameters: AttendanceApiGetClassroomAttendanceRequest = {}, options?: RawAxiosRequestConfig) {
-        return AttendanceApiFp(this.configuration).getClassroomAttendance(requestParameters.classId, requestParameters.status, requestParameters.fromDate, requestParameters.pageNumber, requestParameters.pageSize, requestParameters.search, options).then((request) => request(this.axios, this.basePath));
+        return AttendanceApiFp(this.configuration).getClassroomAttendance(requestParameters.classId, requestParameters.attendanceStatus, requestParameters.fromDate, requestParameters.pageNumber, requestParameters.pageSize, requestParameters.search, options).then((request) => request(this.axios, this.basePath));
     }
 
     /**
@@ -371,13 +447,24 @@ export class AttendanceApi extends BaseAPI {
 
     /**
      * 
-     * @param {AttendanceApiRecordStudentAttendanceRequest} requestParameters Request parameters.
+     * @param {AttendanceApiRecordClassroomAttendanceRequest} requestParameters Request parameters.
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      * @memberof AttendanceApi
      */
-    public recordStudentAttendance(requestParameters: AttendanceApiRecordStudentAttendanceRequest = {}, options?: RawAxiosRequestConfig) {
-        return AttendanceApiFp(this.configuration).recordStudentAttendance(requestParameters.recordStudentAttendanceRequest, options).then((request) => request(this.axios, this.basePath));
+    public recordClassroomAttendance(requestParameters: AttendanceApiRecordClassroomAttendanceRequest = {}, options?: RawAxiosRequestConfig) {
+        return AttendanceApiFp(this.configuration).recordClassroomAttendance(requestParameters.bulkClassroomAttendanceRequest, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @param {AttendanceApiRecordGateAttendanceRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof AttendanceApi
+     */
+    public recordGateAttendance(requestParameters: AttendanceApiRecordGateAttendanceRequest = {}, options?: RawAxiosRequestConfig) {
+        return AttendanceApiFp(this.configuration).recordGateAttendance(requestParameters.recordGateAttendanceRequest, options).then((request) => request(this.axios, this.basePath));
     }
 }
 
@@ -385,7 +472,7 @@ export class AttendanceApi extends BaseAPI {
   * @export
   * @enum {string}
   */
-export enum GetClassroomAttendanceStatusEnum {
+export enum GetClassroomAttendanceAttendanceStatusEnum {
     Present = 'Present',
     Absent = 'Absent',
     Late = 'Late',

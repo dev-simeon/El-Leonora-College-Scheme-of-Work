@@ -1,5 +1,6 @@
 import { Slot, useRouter, useSegments } from "expo-router";
 import { useEffect } from "react";
+import { useFonts, Lexend_400Regular } from "@expo-google-fonts/lexend";
 import { AuthProvider, useAuth } from "../src/context/AuthContext";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
@@ -76,6 +77,16 @@ function RootLayoutNav() {
 }
 
 export default function RootLayout() {
+  const [fontsLoaded] = useFonts({ Lexend: Lexend_400Regular });
+
+  if (!fontsLoaded) {
+    return (
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: COLORS.backgroundLight }}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
+      </View>
+    );
+  }
+
   return (
     <ErrorBoundary>
       <SafeAreaProvider>

@@ -1,8 +1,8 @@
 import { useState } from "react";
 import {
   View,
-  Text,
-  TextInput,
+  Text as NativeText,
+  TextInput as NativeTextInput,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -12,6 +12,7 @@ import {
   KeyboardAvoidingView,
   Button,
 } from "react-native";
+import { LexendText as Text, LexendTextInput as TextInput } from "../../src/components/LexendText";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";

@@ -1,12 +1,13 @@
 import React, { useState } from "react";
 import {
   View,
-  Text,
+  Text as NativeText,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
   Platform,
 } from "react-native";
+import { LexendText as Text } from "../../../src/components/LexendText";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { useRouter } from "expo-router";

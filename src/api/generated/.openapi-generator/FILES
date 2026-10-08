@@ -32,6 +32,7 @@ models/app-version-response-dto.ts
 models/assign-teacher-subjects-dto.ts
 models/basic-school-user-profile-dto-api-response.ts
 models/basic-school-user-profile-dto.ts
+models/bulk-classroom-attendance-request.ts
 models/change-password-dto.ts
 models/class-arm-dto-list-api-response.ts
 models/class-arm-dto.ts
@@ -46,6 +47,7 @@ models/class-info-dto.ts
 models/class-subject-dto-list-api-response.ts
 models/class-subject-dto.ts
 models/class-teacher-dto.ts
+models/classroom-attendance-item.ts
 models/classroom-attendance-student-response-api-paged-response.ts
 models/classroom-attendance-student-response.ts
 models/create-academic-session-request.ts
@@ -55,7 +57,6 @@ models/create-lesson-topic-dto.ts
 models/create-school-event-request.ts
 models/create-school-fee-type-dto.ts
 models/create-staff-dto.ts
-models/create-student-dto.ts
 models/create-student-subscription-dto.ts
 models/create-term-dto.ts
 models/guardian-basic-dto-api-response.ts
@@ -79,7 +80,7 @@ models/login-response-dto.ts
 models/no-data-response-dto-api-response.ts
 models/no-data-response-dto.ts
 models/publish-app-version-dto.ts
-models/record-student-attendance-request.ts
+models/record-gate-attendance-request.ts
 models/register-student-device-dto.ts
 models/remove-staff-subjects-request.ts
 models/reset-password-dto.ts
@@ -109,7 +110,6 @@ models/student-dto-api-paged-response.ts
 models/student-dto-api-response.ts
 models/student-dto-list-api-response.ts
 models/student-dto.ts
-models/student-guardian-dto.ts
 models/student-login-request-dto.ts
 models/student-movement-response.ts
 models/student-status-response-api-response.ts

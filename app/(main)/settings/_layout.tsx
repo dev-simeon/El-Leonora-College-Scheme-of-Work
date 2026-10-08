@@ -5,7 +5,6 @@ export default function SettingsLayout() {
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="index" />
       <Stack.Screen name="about" />
-      <Stack.Screen name="safe-area-check" />
       <Stack.Screen name="change-password" />
       <Stack.Screen name="help-support" />
       <Stack.Screen name="my-tickets" />

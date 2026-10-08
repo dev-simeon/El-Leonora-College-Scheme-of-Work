@@ -12,6 +12,7 @@
     "generate-api": "openapi-generator-cli generate -i \"https://api.elleonoraschools.sch.ng/api-docs/v1/openapi.json\" -g typescript-axios -o src/api/generated -c openapi-config.json --skip-validate-spec"
   },
   "dependencies": {
+    "@expo-google-fonts/lexend": "^0.4.1",
     "@expo/vector-icons": "^15.0.3",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@react-navigation/bottom-tabs": "^7.4.0",

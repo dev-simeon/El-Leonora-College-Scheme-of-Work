@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from "react";
 import {
   View,
-  Text,
+  Text as NativeText,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
   RefreshControl,
 } from "react-native";
+import { LexendText as Text } from "../../src/components/LexendText";
 import { StatusBar } from "expo-status-bar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";

@@ -1,5 +1,6 @@
 import React from "react";
-import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import { View, Text as NativeText, TouchableOpacity, StyleSheet } from "react-native";
+import { LexendText as Text } from "./LexendText";
 import { SPACING } from "../constants/spacing";
 import { TYPO } from "../constants/typography";
 import { COLORS } from "../constants/colors";

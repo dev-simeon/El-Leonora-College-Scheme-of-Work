@@ -1,8 +1,8 @@
 import { useState } from "react";
 import {
   View,
-  Text,
-  TextInput,
+  Text as NativeText,
+  TextInput as NativeTextInput,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -11,6 +11,7 @@ import {
   Alert,
   ActivityIndicator,
 } from "react-native";
+import { LexendText as Text, LexendTextInput as TextInput } from "./LexendText";
 import {
   SafeAreaView,
   useSafeAreaInsets,

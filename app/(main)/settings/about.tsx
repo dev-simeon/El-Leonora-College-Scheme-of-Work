@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import {
   View,
-  Text,
+  Text as NativeText,
   StyleSheet,
   Pressable,
   Alert,
@@ -9,6 +9,7 @@ import {
   Platform,
   ScrollView,
 } from "react-native";
+import { LexendText as Text } from "../../../src/components/LexendText";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";

@@ -1,13 +1,14 @@
 import React, { useState } from "react";
 import {
   View,
-  Text,
+  Text as NativeText,
   StyleSheet,
   ScrollView,
   Pressable,
   Image,
   Modal,
 } from "react-native";
+import { LexendText as Text } from "../LexendText";
 import { StatusBar } from "expo-status-bar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
@@ -19,6 +20,7 @@ import { Configuration } from "../../api/generated/configuration";
 import api, { API_BASE_URL } from "../../services/api";
 import { getApiErrorMessage } from "../../utils/apiError";
 import { UpcomingActivitiesCard } from "./UpcomingActivitiesCard";
+import { useProfileImageUrl } from "../../hooks/useProfileImageUrl";
 
 // ─── API Clients ──────────────────────────────────────────────────────────────
 const accountApi = new AccountApi(
@@ -50,6 +52,7 @@ export default function TeacherDashboard() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user } = useAuth();
+  const { data: profileImageUrl } = useProfileImageUrl();
 
   // Fetch actual profile data (cached by React Query)
   const { data: profileData = null } = useQuery({
@@ -87,6 +90,7 @@ export default function TeacherDashboard() {
           <Image
             source={{
               uri:
+                profileImageUrl ||
                 "https://api.dicebear.com/7.x/avataaars/png?seed=" + firstName,
             }}
             style={styles.avatar}

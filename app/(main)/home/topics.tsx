@@ -1,15 +1,16 @@
 import React, { useState, useMemo, useEffect } from "react";
 import {
   View,
-  Text,
+  Text as NativeText,
   StyleSheet,
   FlatList,
   Pressable,
-  TextInput,
+  TextInput as NativeTextInput,
   ActivityIndicator,
   RefreshControl,
   ScrollView,
 } from "react-native";
+import { LexendText as Text, LexendTextInput as TextInput } from "../../../src/components/LexendText";
 import { useQuery } from "@tanstack/react-query";
 import { useIsFocused } from "expo-router/react-navigation";
 import { StatusBar } from "expo-status-bar";

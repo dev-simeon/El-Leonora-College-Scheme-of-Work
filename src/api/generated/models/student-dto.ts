@@ -61,6 +61,12 @@ export interface StudentDto {
     'gender'?: StudentDtoGenderEnum;
     /**
      * 
+     * @type {string}
+     * @memberof StudentDto
+     */
+    'profileImageUrl': string;
+    /**
+     * 
      * @type {StudentClassDto}
      * @memberof StudentDto
      */

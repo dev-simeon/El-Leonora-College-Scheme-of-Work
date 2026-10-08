@@ -28,7 +28,7 @@ export interface StudentStatusResponse {
      * @type {string}
      * @memberof StudentStatusResponse
      */
-    'studentId'?: string;
+    'studentAdmissionNumber'?: string;
     /**
      * 
      * @type {boolean}

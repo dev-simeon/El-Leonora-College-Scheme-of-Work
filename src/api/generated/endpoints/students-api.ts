@@ -22,8 +22,6 @@ import { DUMMY_BASE_URL, assertParamExists, setApiKeyToObject, setBasicAuthToObj
 // @ts-ignore
 import { BASE_PATH, COLLECTION_FORMATS, type RequestArgs, BaseAPI, RequiredError, operationServerMap } from '../base';
 // @ts-ignore
-import type { CreateStudentDto } from '../models';
-// @ts-ignore
 import type { NoDataResponseDtoApiResponse } from '../models';
 // @ts-ignore
 import type { StudentClassTransferDto } from '../models';
@@ -82,11 +80,19 @@ export const StudentsApiAxiosParamCreator = function (configuration?: Configurat
         },
         /**
          * 
-         * @param {CreateStudentDto} [createStudentDto] 
+         * @param {number} [classArmId] 
+         * @param {string} [firstName] 
+         * @param {string} [middleName] 
+         * @param {string} [lastName] 
+         * @param {EnrollStudentGenderEnum} [gender] 
+         * @param {string} [department] 
+         * @param {string} [guardianId] 
+         * @param {EnrollStudentGuardianRelationshipEnum} [guardianRelationship] 
+         * @param {File} [profileImage] 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        enrollStudent: async (createStudentDto?: CreateStudentDto, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+        enrollStudent: async (classArmId?: number, firstName?: string, middleName?: string, lastName?: string, gender?: EnrollStudentGenderEnum, department?: string, guardianId?: string, guardianRelationship?: EnrollStudentGuardianRelationshipEnum, profileImage?: File, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
             const localVarPath = `/api/v1/Students/enroll`;
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
@@ -98,19 +104,56 @@ export const StudentsApiAxiosParamCreator = function (configuration?: Configurat
             const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
             const localVarHeaderParameter = {} as any;
             const localVarQueryParameter = {} as any;
+            const localVarFormParams = new ((configuration && configuration.formDataCtor) || FormData)();
 
             // authentication Bearer required
             // http bearer authentication required
             await setBearerAuthToObject(localVarHeaderParameter, configuration)
 
 
+            if (classArmId !== undefined) { 
+                localVarFormParams.append('ClassArmId', classArmId as any);
+            }
     
-            localVarHeaderParameter['Content-Type'] = 'application/json';
-
+            if (firstName !== undefined) { 
+                localVarFormParams.append('FirstName', firstName as any);
+            }
+    
+            if (middleName !== undefined) { 
+                localVarFormParams.append('MiddleName', middleName as any);
+            }
+    
+            if (lastName !== undefined) { 
+                localVarFormParams.append('LastName', lastName as any);
+            }
+    
+            if (gender !== undefined) { 
+                localVarFormParams.append('Gender', gender as any);
+            }
+    
+            if (department !== undefined) { 
+                localVarFormParams.append('Department', department as any);
+            }
+    
+            if (guardianId !== undefined) { 
+                localVarFormParams.append('GuardianId', guardianId as any);
+            }
+    
+            if (guardianRelationship !== undefined) { 
+                localVarFormParams.append('GuardianRelationship', guardianRelationship as any);
+            }
+    
+            if (profileImage !== undefined) { 
+                localVarFormParams.append('ProfileImage', profileImage as any);
+            }
+    
+    
+            localVarHeaderParameter['Content-Type'] = 'multipart/form-data';
+    
             setSearchParams(localVarUrlObj, localVarQueryParameter);
             let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
             localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
-            localVarRequestOptions.data = serializeDataIfNeeded(createStudentDto, localVarRequestOptions, configuration)
+            localVarRequestOptions.data = localVarFormParams;
 
             return {
                 url: toPathString(localVarUrlObj),
@@ -410,6 +453,54 @@ export const StudentsApiAxiosParamCreator = function (configuration?: Configurat
                 options: localVarRequestOptions,
             };
         },
+        /**
+         * 
+         * @param {File} profileImage 
+         * @param {string} id 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        updateStudentProfilePicture: async (profileImage: File, id: string, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'profileImage' is not null or undefined
+            assertParamExists('updateStudentProfilePicture', 'profileImage', profileImage)
+            // verify required parameter 'id' is not null or undefined
+            assertParamExists('updateStudentProfilePicture', 'id', id)
+            const localVarPath = `/api/v1/Students/{id}/profile-picture`
+                .replace(`{${"id"}}`, encodeURIComponent(String(id)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'PUT', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+            const localVarFormParams = new ((configuration && configuration.formDataCtor) || FormData)();
+
+            // authentication Bearer required
+            // http bearer authentication required
+            await setBearerAuthToObject(localVarHeaderParameter, configuration)
+
+
+            if (profileImage !== undefined) { 
+                localVarFormParams.append('ProfileImage', profileImage as any);
+            }
+    
+    
+            localVarHeaderParameter['Content-Type'] = 'multipart/form-data';
+    
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = localVarFormParams;
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
     }
 };
 
@@ -434,12 +525,20 @@ export const StudentsApiFp = function(configuration?: Configuration) {
         },
         /**
          * 
-         * @param {CreateStudentDto} [createStudentDto] 
+         * @param {number} [classArmId] 
+         * @param {string} [firstName] 
+         * @param {string} [middleName] 
+         * @param {string} [lastName] 
+         * @param {EnrollStudentGenderEnum} [gender] 
+         * @param {string} [department] 
+         * @param {string} [guardianId] 
+         * @param {EnrollStudentGuardianRelationshipEnum} [guardianRelationship] 
+         * @param {File} [profileImage] 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        async enrollStudent(createStudentDto?: CreateStudentDto, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<StudentDtoApiResponse>> {
-            const localVarAxiosArgs = await localVarAxiosParamCreator.enrollStudent(createStudentDto, options);
+        async enrollStudent(classArmId?: number, firstName?: string, middleName?: string, lastName?: string, gender?: EnrollStudentGenderEnum, department?: string, guardianId?: string, guardianRelationship?: EnrollStudentGuardianRelationshipEnum, profileImage?: File, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<StudentDtoApiResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.enrollStudent(classArmId, firstName, middleName, lastName, gender, department, guardianId, guardianRelationship, profileImage, options);
             const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
             const localVarOperationServerBasePath = operationServerMap['StudentsApi.enrollStudent']?.[localVarOperationServerIndex]?.url;
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
@@ -535,6 +634,19 @@ export const StudentsApiFp = function(configuration?: Configuration) {
             const localVarOperationServerBasePath = operationServerMap['StudentsApi.updateStudent']?.[localVarOperationServerIndex]?.url;
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
+        /**
+         * 
+         * @param {File} profileImage 
+         * @param {string} id 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async updateStudentProfilePicture(profileImage: File, id: string, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<NoDataResponseDtoApiResponse>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.updateStudentProfilePicture(profileImage, id, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['StudentsApi.updateStudentProfilePicture']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
     }
 };
 
@@ -561,7 +673,7 @@ export const StudentsApiFactory = function (configuration?: Configuration, baseP
          * @throws {RequiredError}
          */
         enrollStudent(requestParameters: StudentsApiEnrollStudentRequest = {}, options?: RawAxiosRequestConfig): AxiosPromise<StudentDtoApiResponse> {
-            return localVarFp.enrollStudent(requestParameters.createStudentDto, options).then((request) => request(axios, basePath));
+            return localVarFp.enrollStudent(requestParameters.classArmId, requestParameters.firstName, requestParameters.middleName, requestParameters.lastName, requestParameters.gender, requestParameters.department, requestParameters.guardianId, requestParameters.guardianRelationship, requestParameters.profileImage, options).then((request) => request(axios, basePath));
         },
         /**
          * 
@@ -626,6 +738,15 @@ export const StudentsApiFactory = function (configuration?: Configuration, baseP
         updateStudent(requestParameters: StudentsApiUpdateStudentRequest, options?: RawAxiosRequestConfig): AxiosPromise<StudentDtoApiResponse> {
             return localVarFp.updateStudent(requestParameters.id, requestParameters.updateStudentDto, options).then((request) => request(axios, basePath));
         },
+        /**
+         * 
+         * @param {StudentsApiUpdateStudentProfilePictureRequest} requestParameters Request parameters.
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        updateStudentProfilePicture(requestParameters: StudentsApiUpdateStudentProfilePictureRequest, options?: RawAxiosRequestConfig): AxiosPromise<NoDataResponseDtoApiResponse> {
+            return localVarFp.updateStudentProfilePicture(requestParameters.profileImage, requestParameters.id, options).then((request) => request(axios, basePath));
+        },
     };
 };
 
@@ -651,10 +772,66 @@ export interface StudentsApiDeleteStudentRequest {
 export interface StudentsApiEnrollStudentRequest {
     /**
      * 
-     * @type {CreateStudentDto}
+     * @type {number}
      * @memberof StudentsApiEnrollStudent
      */
-    readonly createStudentDto?: CreateStudentDto
+    readonly classArmId?: number
+
+    /**
+     * 
+     * @type {string}
+     * @memberof StudentsApiEnrollStudent
+     */
+    readonly firstName?: string
+
+    /**
+     * 
+     * @type {string}
+     * @memberof StudentsApiEnrollStudent
+     */
+    readonly middleName?: string
+
+    /**
+     * 
+     * @type {string}
+     * @memberof StudentsApiEnrollStudent
+     */
+    readonly lastName?: string
+
+    /**
+     * 
+     * @type {string}
+     * @memberof StudentsApiEnrollStudent
+     */
+    readonly gender?: EnrollStudentGenderEnum
+
+    /**
+     * 
+     * @type {string}
+     * @memberof StudentsApiEnrollStudent
+     */
+    readonly department?: string
+
+    /**
+     * 
+     * @type {string}
+     * @memberof StudentsApiEnrollStudent
+     */
+    readonly guardianId?: string
+
+    /**
+     * 
+     * @type {string}
+     * @memberof StudentsApiEnrollStudent
+     */
+    readonly guardianRelationship?: EnrollStudentGuardianRelationshipEnum
+
+    /**
+     * 
+     * @type {File}
+     * @memberof StudentsApiEnrollStudent
+     */
+    readonly profileImage?: File
 }
 
 /**
@@ -805,6 +982,27 @@ export interface StudentsApiUpdateStudentRequest {
 }
 
 /**
+ * Request parameters for updateStudentProfilePicture operation in StudentsApi.
+ * @export
+ * @interface StudentsApiUpdateStudentProfilePictureRequest
+ */
+export interface StudentsApiUpdateStudentProfilePictureRequest {
+    /**
+     * 
+     * @type {File}
+     * @memberof StudentsApiUpdateStudentProfilePicture
+     */
+    readonly profileImage: File
+
+    /**
+     * 
+     * @type {string}
+     * @memberof StudentsApiUpdateStudentProfilePicture
+     */
+    readonly id: string
+}
+
+/**
  * StudentsApi - object-oriented interface
  * @export
  * @class StudentsApi
@@ -830,7 +1028,7 @@ export class StudentsApi extends BaseAPI {
      * @memberof StudentsApi
      */
     public enrollStudent(requestParameters: StudentsApiEnrollStudentRequest = {}, options?: RawAxiosRequestConfig) {
-        return StudentsApiFp(this.configuration).enrollStudent(requestParameters.createStudentDto, options).then((request) => request(this.axios, this.basePath));
+        return StudentsApiFp(this.configuration).enrollStudent(requestParameters.classArmId, requestParameters.firstName, requestParameters.middleName, requestParameters.lastName, requestParameters.gender, requestParameters.department, requestParameters.guardianId, requestParameters.guardianRelationship, requestParameters.profileImage, options).then((request) => request(this.axios, this.basePath));
     }
 
     /**
@@ -909,8 +1107,41 @@ export class StudentsApi extends BaseAPI {
     public updateStudent(requestParameters: StudentsApiUpdateStudentRequest, options?: RawAxiosRequestConfig) {
         return StudentsApiFp(this.configuration).updateStudent(requestParameters.id, requestParameters.updateStudentDto, options).then((request) => request(this.axios, this.basePath));
     }
+
+    /**
+     * 
+     * @param {StudentsApiUpdateStudentProfilePictureRequest} requestParameters Request parameters.
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof StudentsApi
+     */
+    public updateStudentProfilePicture(requestParameters: StudentsApiUpdateStudentProfilePictureRequest, options?: RawAxiosRequestConfig) {
+        return StudentsApiFp(this.configuration).updateStudentProfilePicture(requestParameters.profileImage, requestParameters.id, options).then((request) => request(this.axios, this.basePath));
+    }
 }
 
+/**
+  * @export
+  * @enum {string}
+  */
+export enum EnrollStudentGenderEnum {
+    Male = 'Male',
+    Female = 'Female'
+}
+/**
+  * @export
+  * @enum {string}
+  */
+export enum EnrollStudentGuardianRelationshipEnum {
+    Father = 'Father',
+    Mother = 'Mother',
+    Brother = 'Brother',
+    Sister = 'Sister',
+    Uncle = 'Uncle',
+    Aunt = 'Aunt',
+    Cousin = 'Cousin',
+    Other = 'Other'
+}
 /**
   * @export
   * @enum {string}

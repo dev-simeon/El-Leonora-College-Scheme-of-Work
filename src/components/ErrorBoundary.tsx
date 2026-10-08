@@ -1,5 +1,6 @@
 import React, { Component, ErrorInfo, ReactNode } from "react";
-import { View, Text, StyleSheet, Pressable, ScrollView } from "react-native";
+import { View, Text as NativeText, StyleSheet, Pressable, ScrollView } from "react-native";
+import { LexendText as Text } from "./LexendText";
 import { Ionicons } from "@expo/vector-icons";
 import { COLORS } from "../constants/colors";
 import { clearSecureStoreAuth } from "../services/api";
@@ -125,7 +126,7 @@ const styles = StyleSheet.create({
     flexGrow: 0,
   },
   errorText: {
-    fontFamily: "monospace",
+    fontFamily: "Lexend",
     fontSize: 12,
     color: "#991B1B",
   },

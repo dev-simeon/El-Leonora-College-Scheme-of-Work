@@ -7,12 +7,13 @@ import React, {
 } from "react";
 import {
   View,
-  Text,
+  Text as NativeText,
   StyleSheet,
   Animated,
   Dimensions,
   Pressable,
 } from "react-native";
+import { LexendText as Text } from "../components/LexendText";
 import { Ionicons } from "@expo/vector-icons";
 import { COLORS } from "../constants/colors";
 

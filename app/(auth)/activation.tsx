@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect } from "react";
 import {
   View,
-  Text,
-  TextInput,
+  Text as NativeText,
+  TextInput as NativeTextInput,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -11,6 +11,7 @@ import {
   Keyboard,
   Animated,
 } from "react-native";
+import { LexendText as Text, LexendTextInput as TextInput } from "../../src/components/LexendText";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
@@ -26,10 +27,10 @@ export default function ActivationScreen() {
   const [timer, setTimer] = useState(59);
 
   const inputRefs = [
-    useRef<TextInput>(null),
-    useRef<TextInput>(null),
-    useRef<TextInput>(null),
-    useRef<TextInput>(null),
+    useRef<NativeTextInput>(null),
+    useRef<NativeTextInput>(null),
+    useRef<NativeTextInput>(null),
+    useRef<NativeTextInput>(null),
   ];
 
   // Animation for the icon
