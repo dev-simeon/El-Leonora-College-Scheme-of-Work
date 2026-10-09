@@ -86,6 +86,8 @@ export * from './student-dto';
 export * from './student-dto-api-paged-response';
 export * from './student-dto-api-response';
 export * from './student-dto-list-api-response';
+export * from './student-gate-status-response';
+export * from './student-gate-status-response-api-response';
 export * from './student-login-request-dto';
 export * from './student-movement-response';
 export * from './student-status-response';

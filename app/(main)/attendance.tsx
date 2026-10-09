@@ -107,11 +107,26 @@ const CHECK_IN_STUDENTS: Person[] = [
   },
 ];
 const REASONS = [
-  { label: "School Event", value: RecordGateAttendanceRequestGateReasonEnum.SchoolEvent },
-  { label: "School Errand", value: RecordGateAttendanceRequestGateReasonEnum.SchoolErrand },
-  { label: "Medical", value: RecordGateAttendanceRequestGateReasonEnum.Medical },
-  { label: "Early Pickup", value: RecordGateAttendanceRequestGateReasonEnum.EarlyPickup },
-  { label: "School Closed", value: RecordGateAttendanceRequestGateReasonEnum.SchoolClosed },
+  {
+    label: "School Event",
+    value: RecordGateAttendanceRequestGateReasonEnum.SchoolEvent,
+  },
+  {
+    label: "School Errand",
+    value: RecordGateAttendanceRequestGateReasonEnum.SchoolErrand,
+  },
+  {
+    label: "Medical",
+    value: RecordGateAttendanceRequestGateReasonEnum.Medical,
+  },
+  {
+    label: "Early Pickup",
+    value: RecordGateAttendanceRequestGateReasonEnum.EarlyPickup,
+  },
+  {
+    label: "School Closed",
+    value: RecordGateAttendanceRequestGateReasonEnum.SchoolClosed,
+  },
   { label: "Other", value: RecordGateAttendanceRequestGateReasonEnum.Other },
 ] as const;
 const classesApi = new ClassesApi(
@@ -324,7 +339,8 @@ export default function AttendanceScreen() {
     name: string;
   } | null>(null);
   const [option, setOption] = useState<CheckoutOption | null>(null);
-  const [reason, setReason] = useState<RecordGateAttendanceRequestGateReasonEnum | null>(null);
+  const [reason, setReason] =
+    useState<RecordGateAttendanceRequestGateReasonEnum | null>(null);
   const [otherReason, setOtherReason] = useState("");
   const [reasonMenuOpen, setReasonMenuOpen] = useState(false);
   const [manualMode, setManualMode] = useState(false);
@@ -515,24 +531,21 @@ export default function AttendanceScreen() {
         apiError.apiResponse = statusResponse.data;
         throw apiError;
       }
-      const status = statusResponse.data.data as any;
-      const isCurrentlyInSchool =
-        typeof status?.isCurrentlyInSchool === "boolean"
-          ? status.isCurrentlyInSchool
-          : typeof status?.isPresent === "boolean"
-            ? status.isPresent && status.isOutsideSchool !== true
-            : typeof status?.isOutsideSchool === "boolean"
-              ? !status.isOutsideSchool
-              : !status?.activeMovement;
+      const status = statusResponse.data.data;
+      // The current status contract exposes the gate state as `isInSchool`.
+      // Do not infer gate state from classroom attendance (`isPresent`) or an
+      // active movement; a missing value must not accidentally trigger checkout.
+      const isCurrentlyInSchool = status?.isInSchool === true;
+      console.log("[Attendance Status API] Scan decision", {
+        studentAdmissionNo,
+        isInSchool: status?.isInSchool,
+        action: isCurrentlyInSchool ? "open_check_out" : "record_check_in",
+      });
       const knownStudent = CHECK_IN_STUDENTS.find(
         (student) => student.admissionNumber === studentAdmissionNo,
       );
       const studentName =
-        status?.studentName ??
-        status?.name ??
-        qr.name ??
-        knownStudent?.name ??
-        `Student ${studentAdmissionNo}`;
+        qr.name ?? knownStudent?.name ?? `Student ${studentAdmissionNo}`;
       setScannedStudent({ id: studentAdmissionNo, name: studentName });
       if (isCurrentlyInSchool) {
         setScannerOpen(false);
@@ -545,17 +558,16 @@ export default function AttendanceScreen() {
           studentAdmissionNo,
           gateType: RecordGateAttendanceRequestGateTypeEnum.CheckIn,
         };
-        console.log("[Attendance Record API] Request", {
+        console.log("[Attendance Check-In API] Request", {
           method: "POST",
           baseUrl: API_BASE_URL,
           path: "/api/Attendance/students/gate",
           body: recordRequest,
         });
-        const recordResponse =
-          await attendanceApi.recordGateAttendance({
-            recordGateAttendanceRequest: recordRequest,
-          });
-        console.log("[Attendance Record API] Response", {
+        const recordResponse = await attendanceApi.recordGateAttendance({
+          recordGateAttendanceRequest: recordRequest,
+        });
+        console.log("[Attendance Check-In API] Response", {
           httpStatus: recordResponse.status,
           data: recordResponse.data,
         });
@@ -583,18 +595,31 @@ export default function AttendanceScreen() {
           ? "Could not record this student's attendance."
           : "Could not check this student's attendance status.";
       const requestError = error as any;
-      console.log(error);
+      console.log(
+        operation === "record student attendance"
+          ? "[Attendance Check-In API] Request failed"
+          : "[Attendance Status API] Request failed",
+        {
+          httpStatus: requestError?.response?.status,
+          url: requestError?.config?.url,
+          method: requestError?.config?.method,
+          response: requestError?.apiResponse ?? requestError?.response?.data,
+          message: getRequestErrorMessage(error, fallback),
+        },
+      );
       const message = getRequestErrorMessage(error, fallback);
       if (scannerOpen) setScannerError(message);
-      else showToast({ message, type: "error" });
+      showToast({ message, type: "error" });
     } finally {
       setLoading(false);
       scanLock.current = false;
     }
   };
   const selectedReason = reason;
-  const canSubmit = Boolean(selectedReason) &&
-    (selectedReason !== RecordGateAttendanceRequestGateReasonEnum.Other || Boolean(otherReason.trim()));
+  const canSubmit =
+    Boolean(selectedReason) &&
+    (selectedReason !== RecordGateAttendanceRequestGateReasonEnum.Other ||
+      Boolean(otherReason.trim()));
   const submitCheckout = async (_eventDetails?: {
     schoolEventId?: string;
     approvedByStaffId?: string;
@@ -610,7 +635,7 @@ export default function AttendanceScreen() {
     };
     setLoading(true);
     try {
-      console.log("[Attendance Record API] Checkout request", {
+      console.log("[Attendance Check-Out API] Request", {
         method: "POST",
         baseUrl: API_BASE_URL,
         path: "/api/Attendance/students/gate",
@@ -619,7 +644,7 @@ export default function AttendanceScreen() {
       const response = await attendanceApi.recordGateAttendance({
         recordGateAttendanceRequest: requestBody,
       });
-      console.log("[Attendance Record API] Checkout response", {
+      console.log("[Attendance Check-Out API] Response", {
         httpStatus: response.status,
         data: response.data,
       });
@@ -646,6 +671,17 @@ export default function AttendanceScreen() {
       });
       if (canSeeGateCheckIns) void loadGateCheckIns();
     } catch (error) {
+      const requestError = error as any;
+      console.log("[Attendance Check-Out API] Request failed", {
+        httpStatus: requestError?.response?.status,
+        url: requestError?.config?.url,
+        method: requestError?.config?.method,
+        response: requestError?.apiResponse ?? requestError?.response?.data,
+        message: getRequestErrorMessage(
+          error,
+          "Could not record the student's checkout.",
+        ),
+      });
       showToast({
         message: getRequestErrorMessage(
           error,
@@ -704,26 +740,9 @@ export default function AttendanceScreen() {
         pageNumber: 1,
         pageSize,
       };
-      console.log("[Classroom Attendance API] Request", {
-        method: "GET",
-        baseUrl: API_BASE_URL,
-        path: "/api/Attendance/students",
-        params: firstPageParams,
-      });
-      const firstPage = await attendanceApi.getClassroomAttendance(
-        firstPageParams,
-      );
-      console.log("[Classroom Attendance API] Response", {
-        pageNumber: 1,
-        httpStatus: firstPage.status,
-        data: firstPage.data,
-      });
+      const firstPage =
+        await attendanceApi.getClassroomAttendance(firstPageParams);
       if (firstPage.data.success === false) {
-        console.error("[Classroom Attendance API] API error", {
-          pageNumber: 1,
-          httpStatus: firstPage.status,
-          data: firstPage.data,
-        });
         throw new Error(
           getApiErrorMessage(
             firstPage.data,
@@ -745,24 +764,8 @@ export default function AttendanceScreen() {
             pageNumber,
             pageSize,
           };
-          console.log("[Classroom Attendance API] Request", {
-            method: "GET",
-            baseUrl: API_BASE_URL,
-            path: "/api/Attendance/students",
-            params,
-          });
           const response = await attendanceApi.getClassroomAttendance(params);
-          console.log("[Classroom Attendance API] Response", {
-            pageNumber,
-            httpStatus: response.status,
-            data: response.data,
-          });
           if (response.data.success === false) {
-            console.error("[Classroom Attendance API] API error", {
-              pageNumber,
-              httpStatus: response.status,
-              data: response.data,
-            });
             throw new Error(
               getApiErrorMessage(
                 response.data,
@@ -776,29 +779,13 @@ export default function AttendanceScreen() {
       const records = [firstPage, ...laterPages].flatMap(
         (response) => response.data.items ?? [],
       );
-      console.log("[Classroom Attendance API] Loaded records", {
-        fromDate,
-        totalPages,
-        recordCount: records.length,
-      });
       // The attendance-list response currently has studentId but omits the
       // admission number used by this screen. Resolve admission numbers from
       // the student directory and join by database student id.
       requestStage = "student directory lookup";
-      console.log("[Gate Check-In List] Student directory request", {
-        method: "GET",
-        baseUrl: API_BASE_URL,
-        path: "/api/v1/Students",
-        pageSize: 100,
-      });
       const studentPage = await studentsApi.getStudents({
         pageNumber: 1,
         pageSize: 100,
-      });
-      console.log("[Gate Check-In List] Student directory response", {
-        pageNumber: 1,
-        httpStatus: studentPage.status,
-        data: studentPage.data,
       });
       const studentPages = Math.max(
         1,
@@ -807,21 +794,9 @@ export default function AttendanceScreen() {
       const studentRest = await Promise.all(
         Array.from({ length: studentPages - 1 }, async (_, index) => {
           const pageNumber = index + 2;
-          console.log("[Gate Check-In List] Student directory request", {
-            method: "GET",
-            baseUrl: API_BASE_URL,
-            path: "/api/v1/Students",
-            pageNumber,
-            pageSize: 100,
-          });
           const response = await studentsApi.getStudents({
             pageNumber,
             pageSize: 100,
-          });
-          console.log("[Gate Check-In List] Student directory response", {
-            pageNumber,
-            httpStatus: response.status,
-            data: response.data,
           });
           return response;
         }),
@@ -860,19 +835,6 @@ export default function AttendanceScreen() {
           .filter((student) => student.id),
       );
     } catch (error) {
-      const requestError = error as any;
-      console.error("[Gate Check-In List] Request failed", {
-        stage: requestStage,
-        httpStatus: requestError?.response?.status,
-        url: requestError?.config?.url,
-        method: requestError?.config?.method,
-        params: requestError?.config?.params,
-        response: requestError?.response?.data,
-        message: getRequestErrorMessage(
-          error,
-          "Could not load today's gate check-ins.",
-        ),
-      });
       showToast({
         message: getRequestErrorMessage(
           error,
@@ -1001,40 +963,16 @@ export default function AttendanceScreen() {
         // Send the complete class roster: checked students are Present and
         // every unchecked student is explicitly recorded as Absent.
         students: manualStudents.map((student) => ({
-            studentAdmissionNo: student.admissionNumber!.trim(),
-            status: presentIds.includes(student.id)
-              ? ClassroomAttendanceItemStatusEnum.Present
-              : ClassroomAttendanceItemStatusEnum.Absent,
-          })),
+          studentAdmissionNo: student.admissionNumber!.trim(),
+          status: presentIds.includes(student.id)
+            ? ClassroomAttendanceItemStatusEnum.Present
+            : ClassroomAttendanceItemStatusEnum.Absent,
+        })),
       };
-      console.log("[Record Classroom Attendance API] Request", {
-        method: "POST",
-        baseUrl: API_BASE_URL,
-        path: "/api/Attendance/students/classroom",
-        rosterCount: requestBody.students?.length ?? 0,
-        presentCount: requestBody.students?.filter(
-          (student) =>
-            student.status === ClassroomAttendanceItemStatusEnum.Present,
-        ).length ?? 0,
-        absentCount: requestBody.students?.filter(
-          (student) =>
-            student.status === ClassroomAttendanceItemStatusEnum.Absent,
-        ).length ?? 0,
-        body: requestBody,
-      });
       const response = await attendanceApi.recordClassroomAttendance({
         bulkClassroomAttendanceRequest: requestBody,
       });
-      console.log("[Record Classroom Attendance API] Response", {
-        httpStatus: response.status,
-        data: response.data,
-      });
       if (response.data.success !== true) {
-        console.error("[Record Classroom Attendance API] API error", {
-          httpStatus: response.status,
-          data: response.data,
-          request: requestBody,
-        });
         throw new Error(
           getApiErrorMessage(response.data, "Could not save attendance."),
         );
@@ -1046,17 +984,6 @@ export default function AttendanceScreen() {
         type: "success",
       });
     } catch (error) {
-      const requestError = error as any;
-      console.error("[Record Classroom Attendance API] Request failed", {
-        httpStatus: requestError?.response?.status,
-        url: requestError?.config?.url,
-        method: requestError?.config?.method,
-        response: requestError?.response?.data,
-        message: getRequestErrorMessage(
-          error,
-          "Could not save attendance. Please try again.",
-        ),
-      });
       showToast({
         message: getRequestErrorMessage(
           error,
@@ -1284,7 +1211,11 @@ export default function AttendanceScreen() {
         onMenu={() => setReasonMenuOpen(!reasonMenuOpen)}
         onSubmit={submitCheckout}
       />
-      <SuccessModal success={success} copy={copy} onDone={dismissSuccess} />
+      <SuccessModal
+        success={success}
+        copy={copy}
+        onDone={dismissSuccess}
+      />
     </View>
   );
 }
@@ -1542,7 +1473,11 @@ function ScanOnlyView({
         onMenu={onReasonMenu}
         onSubmit={onSubmitCheckout}
       />
-      <SuccessModal success={success} copy={copy} onDone={onDone} />
+      <SuccessModal
+        success={success}
+        copy={copy}
+        onDone={onDone}
+      />
     </View>
   );
 }
@@ -1728,26 +1663,20 @@ function CheckoutModal({
       eventLoading ||
       eventOptionsLoaded ||
       eventOptionsRequestStarted.current
-    ) return;
+    )
+      return;
     eventOptionsRequestStarted.current = true;
     setEventLoading(true);
     setEventError(null);
     try {
-      console.log("[School Event Picker] Loading current term and staff", {
-        currentTermEndpoint: "/api/v1/AcademicSessions/current",
-        staffEndpoint: "/api/v1/staffs",
-      });
       const [sessionResponse, staffResponse] = await Promise.all([
         academicSessionsApi.getCurrentAcademicSession(),
         staffsApi.getStaffs({ pageSize: 100 }),
       ]);
-      console.log("[School Event Picker] Current term/staff responses", {
-        sessionStatus: sessionResponse.status,
-        session: sessionResponse.data,
-        staffStatus: staffResponse.status,
-        staff: staffResponse.data,
-      });
-      if (sessionResponse.data.success === false || staffResponse.data.success === false) {
+      if (
+        sessionResponse.data.success === false ||
+        staffResponse.data.success === false
+      ) {
         throw new Error(
           sessionResponse.data.message ||
             staffResponse.data.message ||
@@ -1759,30 +1688,16 @@ function CheckoutModal({
       )?.id;
       // AuthContext can contain a display placeholder like "2"; the activities
       // endpoint requires the real current-term identifier.
-      const resolvedTermId = currentTermId ||
-        (termId && !/^\d+$/.test(termId) ? termId : undefined);
+      const resolvedTermId =
+        currentTermId || (termId && !/^\d+$/.test(termId) ? termId : undefined);
       if (!resolvedTermId) {
         throw new Error("Could not find the current term for school events.");
       }
-      console.log("[School Event Picker] Activities request", {
-        method: "GET",
-        baseUrl: API_BASE_URL,
-        path: `/api/v1/Terms/terms/${encodeURIComponent(resolvedTermId)}/activities`,
-        params: {
-          filter: GetTermActivitiesFilterEnum.All,
-          pageNumber: 1,
-          pageSize: 100,
-        },
-      });
       const eventResponse = await termsApi.getTermActivities({
         termId: resolvedTermId,
         filter: GetTermActivitiesFilterEnum.All,
         pageNumber: 1,
         pageSize: 100,
-      });
-      console.log("[School Event Picker] Activities response", {
-        httpStatus: eventResponse.status,
-        data: eventResponse.data,
       });
       if (eventResponse.data.success === false) {
         throw new Error(
@@ -1814,13 +1729,6 @@ function CheckoutModal({
         error,
         "Could not load school events and staff.",
       );
-      const requestError = error as any;
-      console.error("[School Event Picker] Load failed", {
-        httpStatus: requestError?.response?.status,
-        url: requestError?.config?.url,
-        response: requestError?.response?.data,
-        message,
-      });
       setEventError(message);
     } finally {
       eventOptionsRequestStarted.current = false;
@@ -1886,95 +1794,103 @@ function CheckoutModal({
               keyboardShouldPersistTaps="handled"
               showsVerticalScrollIndicator={false}
             >
-            <View style={styles.handle} />
-            <Text style={styles.sheetTitle}>Leave School</Text>
-            <Text
-              style={{
-                marginTop: 8,
-                fontSize: 18,
-                fontWeight: "700",
-                color: "#0F172A",
-                fontFamily: "Lexend",
-              }}
-            >
-              {student?.name ?? "Student"}
-            </Text>
-            <Text
-              style={{
-                marginTop: 4,
-                marginBottom: 12,
-                fontSize: 12,
-                fontWeight: "800",
-                letterSpacing: 1,
-                color: "#D97706",
-                fontFamily: "Lexend",
-              }}
-            >
-              Currently: IN SCHOOL
-            </Text>
-            <Text style={styles.sheetSub}>
-              Why is {student?.name?.split(" ")[0] ?? "this student"} leaving?
-            </Text>
-            <View style={{ marginBottom: 4 }}>
-            {REASONS.filter(
-                (item) =>
-                  reason !== RecordGateAttendanceRequestGateReasonEnum.Other ||
-                  item.value === RecordGateAttendanceRequestGateReasonEnum.Other,
-              ).map((item) => (
-                <Choice
-                  key={item.value}
-                  active={reason === item.value}
-                  title={item.label}
-                  onPress={() => {
-                    if (
-                      item.value ===
-                      RecordGateAttendanceRequestGateReasonEnum.SchoolEvent
-                    ) {
-                      openSchoolEvent();
-                      return;
-                    }
-                    setEventId(null);
-                    setSupervisorId(null);
-                    onReason(item.value);
-                  }}
+              <View style={styles.handle} />
+              <Text style={styles.sheetTitle}>Leave School</Text>
+              <Text
+                style={{
+                  marginTop: 8,
+                  fontSize: 18,
+                  fontWeight: "700",
+                  color: "#0F172A",
+                  fontFamily: "Lexend",
+                }}
+              >
+                {student?.name ?? "Student"}
+              </Text>
+              <Text
+                style={{
+                  marginTop: 4,
+                  marginBottom: 12,
+                  fontSize: 12,
+                  fontWeight: "800",
+                  letterSpacing: 1,
+                  color: "#D97706",
+                  fontFamily: "Lexend",
+                }}
+              >
+                Currently: IN SCHOOL
+              </Text>
+              <Text style={styles.sheetSub}>
+                Why is {student?.name?.split(" ")[0] ?? "this student"} leaving?
+              </Text>
+              <View style={{ marginBottom: 4 }}>
+                {REASONS.filter(
+                  (item) =>
+                    reason !==
+                      RecordGateAttendanceRequestGateReasonEnum.Other ||
+                    item.value ===
+                      RecordGateAttendanceRequestGateReasonEnum.Other,
+                ).map((item) => (
+                  <Choice
+                    key={item.value}
+                    active={reason === item.value}
+                    title={item.label}
+                    onPress={() => {
+                      if (
+                        item.value ===
+                        RecordGateAttendanceRequestGateReasonEnum.SchoolEvent
+                      ) {
+                        openSchoolEvent();
+                        return;
+                      }
+                      setEventId(null);
+                      setSupervisorId(null);
+                      onReason(item.value);
+                    }}
+                  />
+                ))}
+              </View>
+              {reason ===
+                RecordGateAttendanceRequestGateReasonEnum.SchoolEvent &&
+                (selectedEvent || selectedSupervisor) && (
+                  <Text style={styles.eventSelectionSummary}>
+                    {[selectedEvent?.label, selectedSupervisor?.label]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </Text>
+                )}
+              {reason === RecordGateAttendanceRequestGateReasonEnum.Other && (
+                <TextInput
+                  style={styles.reasonTextArea}
+                  placeholder="Enter reason"
+                  value={otherReason}
+                  onChangeText={onOther}
+                  multiline
+                  textAlignVertical="top"
+                  numberOfLines={4}
                 />
-              ))}
-            </View>
-            {reason === RecordGateAttendanceRequestGateReasonEnum.SchoolEvent &&
-              (selectedEvent || selectedSupervisor) && (
-                <Text style={styles.eventSelectionSummary}>
-                  {[selectedEvent?.label, selectedSupervisor?.label]
-                    .filter(Boolean)
-                    .join(" · ")}
-                </Text>
               )}
-            {reason === RecordGateAttendanceRequestGateReasonEnum.Other && (
-              <TextInput
-                style={styles.reasonTextArea}
-                placeholder="Enter reason"
-                value={otherReason}
-                onChangeText={onOther}
-                multiline
-                textAlignVertical="top"
-                numberOfLines={4}
-              />
-            )}
-            <TouchableOpacity
-              style={[styles.doneButton, !canSubmitCheckout && styles.disabled]}
-              disabled={!canSubmitCheckout || loading}
-              onPress={() =>
-                onSubmit({
-                  schoolEventId: eventId ?? undefined,
-                  approvedByStaffId: supervisorId ?? undefined,
-                })
-              }
-            >
-              {loading ? (
-                <ActivityIndicator color="#FFF" />
-              ) : (
-                <Text style={styles.doneButtonText}>Confirm Leave School</Text>
-              )}
-            </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.doneButton,
+                  !canSubmitCheckout && styles.disabled,
+                ]}
+                disabled={!canSubmitCheckout || loading}
+                onPress={() =>
+                  onSubmit({
+                    schoolEventId: eventId ?? undefined,
+                    approvedByStaffId: supervisorId ?? undefined,
+                  })
+                }
+              >
+                {loading ? (
+                  <ActivityIndicator color="#FFF" />
+                ) : (
+                  <Text style={styles.doneButtonText}>
+                    Confirm Leave School
+                  </Text>
+                )}
+              </TouchableOpacity>
             </ScrollView>
           </View>
         </View>
@@ -2033,99 +1949,89 @@ function SchoolEventModal({
   const supervisor = supervisors.find((item: any) => item.id === supervisorId);
   if (!visible) return null;
   return (
-      <View style={[styles.overlay, styles.eventModalOverlay]}>
-        <Pressable style={styles.dismiss} onPress={onClose} />
-        <View style={[styles.sheet, styles.keyboardSheet]}>
-          <View style={styles.handle} />
-          <Text style={styles.sheetTitle}>School Event Details</Text>
-          <Text style={styles.sheetSub}>
-            Select the event and staff member supervising the student.
-          </Text>
-          {loading ? (
-            <ActivityIndicator
-              color={COLORS.primary}
-              style={{ marginVertical: 28 }}
-            />
-          ) : error ? (
-            <View style={styles.eventErrorState}>
-              <Text style={styles.eventErrorText}>{error}</Text>
-              <TouchableOpacity
-                style={styles.eventRetryButton}
-                onPress={onRetry}
-              >
-                <Text style={styles.eventRetryText}>Try again</Text>
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <>
-              <Text style={styles.classLabel}>Event</Text>
-              <TouchableOpacity
-                style={styles.classSelect}
-                onPress={onEventMenu}
-              >
-                <Text
-                  style={event ? styles.classSelectText : styles.placeholder}
-                >
-                  {event?.label ?? "Select an event"}
-                </Text>
-                <Ionicons name="chevron-down" size={20} color="#64748B" />
-              </TouchableOpacity>
-              {eventMenuOpen && (
-                <View style={styles.classMenu}>
-                  {events.map((item: any) => (
-                    <TouchableOpacity
-                      key={item.id}
-                      style={styles.classMenuItem}
-                      onPress={() => onEvent(item.id)}
-                    >
-                      <Text style={styles.classMenuText}>{item.label}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              )}
-              <Text style={[styles.classLabel, { marginTop: 18 }]}>
-                Supervisor
+    <View style={[styles.overlay, styles.eventModalOverlay]}>
+      <Pressable style={styles.dismiss} onPress={onClose} />
+      <View style={[styles.sheet, styles.keyboardSheet]}>
+        <View style={styles.handle} />
+        <Text style={styles.sheetTitle}>School Event Details</Text>
+        <Text style={styles.sheetSub}>
+          Select the event and staff member supervising the student.
+        </Text>
+        {loading ? (
+          <ActivityIndicator
+            color={COLORS.primary}
+            style={{ marginVertical: 28 }}
+          />
+        ) : error ? (
+          <View style={styles.eventErrorState}>
+            <Text style={styles.eventErrorText}>{error}</Text>
+            <TouchableOpacity style={styles.eventRetryButton} onPress={onRetry}>
+              <Text style={styles.eventRetryText}>Try again</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <>
+            <Text style={styles.classLabel}>Event</Text>
+            <TouchableOpacity style={styles.classSelect} onPress={onEventMenu}>
+              <Text style={event ? styles.classSelectText : styles.placeholder}>
+                {event?.label ?? "Select an event"}
               </Text>
-              <TouchableOpacity
-                style={styles.classSelect}
-                onPress={onSupervisorMenu}
+              <Ionicons name="chevron-down" size={20} color="#64748B" />
+            </TouchableOpacity>
+            {eventMenuOpen && (
+              <View style={styles.classMenu}>
+                {events.map((item: any) => (
+                  <TouchableOpacity
+                    key={item.id}
+                    style={styles.classMenuItem}
+                    onPress={() => onEvent(item.id)}
+                  >
+                    <Text style={styles.classMenuText}>{item.label}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+            <Text style={[styles.classLabel, { marginTop: 18 }]}>
+              Supervisor
+            </Text>
+            <TouchableOpacity
+              style={styles.classSelect}
+              onPress={onSupervisorMenu}
+            >
+              <Text
+                style={supervisor ? styles.classSelectText : styles.placeholder}
               >
-                <Text
-                  style={
-                    supervisor ? styles.classSelectText : styles.placeholder
-                  }
-                >
-                  {supervisor?.label ?? "Select supervising staff"}
-                </Text>
-                <Ionicons name="chevron-down" size={20} color="#64748B" />
-              </TouchableOpacity>
-              {supervisorMenuOpen && (
-                <View style={styles.classMenu}>
-                  {supervisors.map((item: any) => (
-                    <TouchableOpacity
-                      key={item.id}
-                      style={styles.classMenuItem}
-                      onPress={() => onSupervisor(item.id)}
-                    >
-                      <Text style={styles.classMenuText}>{item.label}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              )}
-              <TouchableOpacity
-                style={[
-                  styles.doneButton,
-                  (!event || !supervisor) && styles.disabled,
-                ]}
-                disabled={!event || !supervisor}
-                onPress={onConfirm}
-              >
-                <Text style={styles.doneButtonText}>Use Event Details</Text>
-              </TouchableOpacity>
-            </>
-          )}
-        </View>
+                {supervisor?.label ?? "Select supervising staff"}
+              </Text>
+              <Ionicons name="chevron-down" size={20} color="#64748B" />
+            </TouchableOpacity>
+            {supervisorMenuOpen && (
+              <View style={styles.classMenu}>
+                {supervisors.map((item: any) => (
+                  <TouchableOpacity
+                    key={item.id}
+                    style={styles.classMenuItem}
+                    onPress={() => onSupervisor(item.id)}
+                  >
+                    <Text style={styles.classMenuText}>{item.label}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+            <TouchableOpacity
+              style={[
+                styles.doneButton,
+                (!event || !supervisor) && styles.disabled,
+              ]}
+              disabled={!event || !supervisor}
+              onPress={onConfirm}
+            >
+              <Text style={styles.doneButtonText}>Use Event Details</Text>
+            </TouchableOpacity>
+          </>
+        )}
       </View>
+    </View>
   );
 }
 function Choice({ active, title, description, onPress }: any) {
@@ -2146,7 +2052,11 @@ function Choice({ active, title, description, onPress }: any) {
     </TouchableOpacity>
   );
 }
-function SuccessModal({ success, copy, onDone }: any) {
+function SuccessModal({
+  success,
+  copy,
+  onDone,
+}: any) {
   return (
     <Modal visible={Boolean(success)} transparent animationType="fade">
       <View style={styles.successOverlay}>

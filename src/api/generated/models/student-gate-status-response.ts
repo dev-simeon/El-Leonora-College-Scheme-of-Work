@@ -20,50 +20,26 @@ import type { StudentMovementResponse } from './student-movement-response';
 /**
  * 
  * @export
- * @interface StudentStatusResponse
+ * @interface StudentGateStatusResponse
  */
-export interface StudentStatusResponse {
+export interface StudentGateStatusResponse {
     /**
      * 
      * @type {string}
-     * @memberof StudentStatusResponse
+     * @memberof StudentGateStatusResponse
      */
     'studentAdmissionNumber'?: string;
     /**
      * 
      * @type {boolean}
-     * @memberof StudentStatusResponse
+     * @memberof StudentGateStatusResponse
      */
     'isInSchool'?: boolean;
     /**
      * 
-     * @type {string}
-     * @memberof StudentStatusResponse
-     */
-    'lastAttendanceAt'?: string | null;
-    /**
-     * 
-     * @type {string}
-     * @memberof StudentStatusResponse
-     */
-    'lastAttendanceStatus'?: StudentStatusResponseLastAttendanceStatusEnum | null;
-    /**
-     * 
      * @type {StudentMovementResponse}
-     * @memberof StudentStatusResponse
+     * @memberof StudentGateStatusResponse
      */
     'activeMovement'?: StudentMovementResponse;
 }
-
-/**
-    * @export
-    * @enum {string}
-    */
-export enum StudentStatusResponseLastAttendanceStatusEnum {
-    Present = 'Present',
-    Absent = 'Absent',
-    Late = 'Late',
-    Excused = 'Excused'
-}
-
 

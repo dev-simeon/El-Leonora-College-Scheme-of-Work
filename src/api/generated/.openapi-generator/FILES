@@ -110,6 +110,8 @@ models/student-dto-api-paged-response.ts
 models/student-dto-api-response.ts
 models/student-dto-list-api-response.ts
 models/student-dto.ts
+models/student-gate-status-response-api-response.ts
+models/student-gate-status-response.ts
 models/student-login-request-dto.ts
 models/student-movement-response.ts
 models/student-status-response-api-response.ts

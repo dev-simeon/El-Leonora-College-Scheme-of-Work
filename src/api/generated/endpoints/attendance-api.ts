@@ -30,6 +30,8 @@ import type { NoDataResponseDtoApiResponse } from '../models';
 // @ts-ignore
 import type { RecordGateAttendanceRequest } from '../models';
 // @ts-ignore
+import type { StudentGateStatusResponseApiResponse } from '../models';
+// @ts-ignore
 import type { StudentStatusResponseApiResponse } from '../models';
 /**
  * AttendanceApi - axios parameter creator
@@ -246,7 +248,7 @@ export const AttendanceApiFp = function(configuration?: Configuration) {
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        async getStudentStatus(studentAdmissionNo: string, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<StudentStatusResponseApiResponse>> {
+        async getStudentStatus(studentAdmissionNo: string, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<StudentGateStatusResponseApiResponse>> {
             const localVarAxiosArgs = await localVarAxiosParamCreator.getStudentStatus(studentAdmissionNo, options);
             const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
             const localVarOperationServerBasePath = operationServerMap['AttendanceApi.getStudentStatus']?.[localVarOperationServerIndex]?.url;
@@ -301,7 +303,7 @@ export const AttendanceApiFactory = function (configuration?: Configuration, bas
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        getStudentStatus(requestParameters: AttendanceApiGetStudentStatusRequest, options?: RawAxiosRequestConfig): AxiosPromise<StudentStatusResponseApiResponse> {
+        getStudentStatus(requestParameters: AttendanceApiGetStudentStatusRequest, options?: RawAxiosRequestConfig): AxiosPromise<StudentGateStatusResponseApiResponse> {
             return localVarFp.getStudentStatus(requestParameters.studentAdmissionNo, options).then((request) => request(axios, basePath));
         },
         /**
