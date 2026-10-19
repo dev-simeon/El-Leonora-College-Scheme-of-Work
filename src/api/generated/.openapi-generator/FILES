@@ -94,10 +94,14 @@ models/school-fee-type-dto.ts
 models/school-fee-type-info-dto.ts
 models/school-role-dto-ienumerable-api-response.ts
 models/school-role-dto.ts
+models/staff-attendance-response-api-paged-response.ts
+models/staff-attendance-response-api-response.ts
+models/staff-attendance-response.ts
 models/staff-detail-dto-api-response.ts
 models/staff-detail-dto.ts
 models/staff-dto-api-paged-response.ts
 models/staff-dto.ts
+models/staff-gate-attendance-request.ts
 models/staff-role-dto-list-api-response.ts
 models/staff-role-dto.ts
 models/student-basic-dto.ts
@@ -114,8 +118,7 @@ models/student-gate-status-response-api-response.ts
 models/student-gate-status-response.ts
 models/student-login-request-dto.ts
 models/student-movement-response.ts
-models/student-status-response-api-response.ts
-models/student-status-response.ts
+models/student-school-event-request.ts
 models/student-subscription-dto-api-paged-response.ts
 models/student-subscription-dto-api-response.ts
 models/student-subscription-dto.ts

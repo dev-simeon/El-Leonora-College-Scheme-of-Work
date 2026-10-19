@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import {
   View,
-  Text as NativeText,
   StyleSheet,
   ScrollView,
   Pressable,
@@ -16,6 +15,9 @@ import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "../../context/AuthContext";
 import { useQuery } from "@tanstack/react-query";
 import { AccountApi } from "../../api/generated/endpoints/account-api";
+import { AttendanceApi } from "../../api/generated/endpoints/attendance-api";
+import { AcademicSessionsApi } from "../../api/generated/endpoints/academic-sessions-api";
+import { StudentsApi } from "../../api/generated/endpoints/students-api";
 import { Configuration } from "../../api/generated/configuration";
 import api, { API_BASE_URL } from "../../services/api";
 import { getApiErrorMessage } from "../../utils/apiError";
@@ -28,6 +30,36 @@ const accountApi = new AccountApi(
   API_BASE_URL,
   api,
 );
+const attendanceApi = new AttendanceApi(
+  new Configuration({ basePath: API_BASE_URL }),
+  API_BASE_URL,
+  api,
+);
+const academicSessionsApi = new AcademicSessionsApi(
+  new Configuration({ basePath: API_BASE_URL }),
+  API_BASE_URL,
+  api,
+);
+const studentsApi = new StudentsApi(
+  new Configuration({ basePath: API_BASE_URL }),
+  API_BASE_URL,
+  api,
+);
+
+const getLocalDate = () => {
+  const now = new Date();
+  return [
+    now.getFullYear(),
+    String(now.getMonth() + 1).padStart(2, "0"),
+    String(now.getDate()).padStart(2, "0"),
+  ].join("-");
+};
+
+const formatTermName = (name?: string | null) => {
+  const termName = name?.trim();
+  if (!termName) return "Current Term";
+  return /\bterm\b/i.test(termName) ? termName : `${termName} Term`;
+};
 
 // Stitch Design Tokens
 const STITCH_COLORS = {
@@ -67,6 +99,72 @@ export default function StudentDashboard() {
       return response.data.data;
     },
     enabled: !!user,
+  });
+
+  const { data: currentTermName } = useQuery({
+    queryKey: ["dashboard-current-term-name", user?.id],
+    queryFn: async () => {
+      const response = await academicSessionsApi.getCurrentAcademicSession();
+      if (!response.data.success) {
+        throw new Error(getApiErrorMessage(response.data, "Could not load current term."));
+      }
+      return response.data.data?.terms?.find((term) => term.isCurrent)?.name ?? null;
+    },
+    enabled: !!user,
+    retry: false,
+  });
+
+  const classId = profileData?.classInfo?.classId;
+  const {
+    data: studentAttendance,
+    isLoading: isAttendanceLoading,
+    isError: isAttendanceError,
+    refetch: refetchStudentAttendance,
+  } = useQuery({
+    queryKey: ["dashboard-student-attendance", user?.id, classId, getLocalDate()],
+    queryFn: async () => {
+      if (!classId) return null;
+      const [attendanceResponse, rosterResponse] = await Promise.all([
+        attendanceApi.getClassroomAttendance({
+          classId,
+          fromDate: getLocalDate(),
+          pageNumber: 1,
+          pageSize: 500,
+        }),
+        studentsApi.getStudentsByClass({ classId }),
+      ]);
+      if (attendanceResponse.data.success === false) {
+        throw new Error(getApiErrorMessage(attendanceResponse.data, "Could not load today's attendance."));
+      }
+      if (rosterResponse.data.success === false) {
+        throw new Error(getApiErrorMessage(rosterResponse.data, "Could not load the class student list."));
+      }
+      const totalPages = Math.max(1, attendanceResponse.data.pagination?.totalPages ?? 1);
+      const remainingPages = await Promise.all(
+        Array.from({ length: totalPages - 1 }, async (_, index) => {
+          const page = await attendanceApi.getClassroomAttendance({
+            classId,
+            fromDate: getLocalDate(),
+            pageNumber: index + 2,
+            pageSize: 500,
+          });
+          if (page.data.success === false) {
+            throw new Error(getApiErrorMessage(page.data, "Could not load today's attendance."));
+          }
+          return page.data.items ?? [];
+        }),
+      );
+      const records = [
+        ...(attendanceResponse.data.items ?? []),
+        ...remainingPages.flat(),
+      ];
+      return {
+        inSchool: records.filter((record) => record.isInSchool === true).length,
+        total: rosterResponse.data.data?.length ?? 0,
+      };
+    },
+    enabled: !!user && user.role === "student" && !!classId,
+    retry: false,
   });
 
   const firstName =
@@ -119,7 +217,7 @@ export default function StudentDashboard() {
         <View style={styles.mainGreeting}>
           <Text style={styles.greetingTitle}>Good Morning, {firstName}</Text>
           <Text style={styles.greetingSubtitle}>
-            {user?.currentTerm || "Current Term"} • 3 Classes Left
+            {formatTermName(currentTermName)} • 3 Classes Left
           </Text>
         </View>
 
@@ -128,7 +226,7 @@ export default function StudentDashboard() {
           <View style={styles.cardHeader}>
             <View>
               <Text style={styles.cardTitle}>Attendance</Text>
-              <Text style={styles.cardSubtitle}>This Month</Text>
+              <Text style={styles.cardSubtitle}>Today's attendance</Text>
             </View>
             <View style={styles.iconContainerPrimary}>
               <Ionicons
@@ -139,40 +237,24 @@ export default function StudentDashboard() {
             </View>
           </View>
 
-          <View style={styles.heroMiddle}>
-            <View style={styles.progressCircle}>
-              <Text style={styles.progressText}>94%</Text>
-            </View>
-            <View style={styles.streakContainer}>
-              <View style={styles.streakRow}>
-                <Ionicons
-                  name="flame"
-                  size={20}
-                  color={STITCH_COLORS.tertiary}
-                />
-                <Text style={styles.streakText}>12 Day Streak</Text>
-              </View>
-              <Text style={styles.streakSubtext}>Excellent consistency.</Text>
-            </View>
-          </View>
-
-          <View style={styles.chartContainer}>
-            {["M", "T", "W", "T", "F"].map((day, index) => (
-              <View key={index} style={styles.chartBarWrapper}>
-                <View
-                  style={[
-                    styles.chartBar,
-                    index === 4
-                      ? {
-                          height: "50%",
-                          backgroundColor: STITCH_COLORS.surfaceContainerHigh,
-                        }
-                      : { height: "100%" },
-                  ]}
-                />
-                <Text style={styles.chartDayText}>{day}</Text>
-              </View>
-            ))}
+          <View style={styles.studentAttendanceSummary}>
+            <Text style={styles.studentAttendanceValue}>
+              {isAttendanceLoading
+                ? "Loading…"
+                : isAttendanceError
+                  ? "Unavailable"
+                  : `${studentAttendance?.inSchool ?? 0}/${studentAttendance?.total ?? 0}`}
+            </Text>
+            <Text style={styles.cardSubtitle}>
+              {isAttendanceError
+                ? "Could not load today's attendance"
+                : "Students in school today"}
+            </Text>
+            {isAttendanceError ? (
+              <Pressable onPress={() => void refetchStudentAttendance()}>
+                <Text style={styles.retryAttendanceText}>Try again</Text>
+              </Pressable>
+            ) : null}
           </View>
         </View>
 
@@ -251,7 +333,10 @@ export default function StudentDashboard() {
               <Text style={styles.actionText}>My Subjects</Text>
             </Pressable>
 
-            <Pressable style={styles.actionItem}>
+            <Pressable
+              style={styles.actionItem}
+              onPress={() => setScheduleModalVisible(true)}
+            >
               <View style={styles.actionIconContainer}>
                 <Ionicons
                   name="calendar-outline"
@@ -272,6 +357,7 @@ export default function StudentDashboard() {
               </View>
               <Text style={styles.actionText}>Notes</Text>
             </Pressable>
+
           </ScrollView>
         </View>
 
@@ -570,6 +656,21 @@ const styles = StyleSheet.create({
   cardSubtitle: {
     fontSize: 14,
     color: STITCH_COLORS.onSurfaceVariant,
+  },
+  studentAttendanceSummary: {
+    minHeight: 96,
+    justifyContent: "center",
+    gap: 8,
+  },
+  studentAttendanceValue: {
+    fontSize: 28,
+    fontWeight: "700",
+    color: STITCH_COLORS.primary,
+  },
+  retryAttendanceText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: STITCH_COLORS.primary,
   },
   viewAllBtn: {
     flexDirection: "row",

@@ -37,12 +37,6 @@ export interface StudentMovementResponse {
      * @type {string}
      * @memberof StudentMovementResponse
      */
-    'reason'?: string | null;
-    /**
-     * 
-     * @type {string}
-     * @memberof StudentMovementResponse
-     */
     'schoolEventId'?: string | null;
     /**
      * 
@@ -85,6 +79,8 @@ export enum StudentMovementResponseMovementTypeEnum {
     SchoolErrand = 'SchoolErrand',
     Medical = 'Medical',
     EarlyPickup = 'EarlyPickup',
+    EarlyCheckOut = 'EarlyCheckOut',
+    SchoolClosed = 'SchoolClosed',
     Other = 'Other'
 }
 

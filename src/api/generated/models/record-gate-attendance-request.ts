@@ -13,6 +13,9 @@
  */
 
 
+// May contain unused imports in some cases
+// @ts-ignore
+import type { StudentSchoolEventRequest } from './student-school-event-request';
 
 /**
  * 
@@ -44,6 +47,30 @@ export interface RecordGateAttendanceRequest {
      * @memberof RecordGateAttendanceRequest
      */
     'otherReason'?: string | null;
+    /**
+     * 
+     * @type {string}
+     * @memberof RecordGateAttendanceRequest
+     */
+    'approvedByStaffId'?: string | null;
+    /**
+     * 
+     * @type {StudentSchoolEventRequest}
+     * @memberof RecordGateAttendanceRequest
+     */
+    'schoolEvent'?: StudentSchoolEventRequest;
+    /**
+     * 
+     * @type {string}
+     * @memberof RecordGateAttendanceRequest
+     */
+    'destination'?: string | null;
+    /**
+     * 
+     * @type {string}
+     * @memberof RecordGateAttendanceRequest
+     */
+    'extraNotes'?: string | null;
 }
 
 /**

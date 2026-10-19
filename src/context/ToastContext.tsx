@@ -15,6 +15,7 @@ import {
 } from "react-native";
 import { LexendText as Text } from "../components/LexendText";
 import { Ionicons } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { COLORS } from "../constants/colors";
 
 type ToastType = "success" | "error" | "info";
@@ -34,6 +35,7 @@ const ToastContext = createContext<ToastContextType | undefined>(undefined);
 export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
+  const insets = useSafeAreaInsets();
   const [toast, setToast] = useState<ToastOptions | null>(null);
   const opacity = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(-100)).current;
@@ -67,7 +69,7 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({
           useNativeDriver: false,
         }),
         Animated.timing(translateY, {
-          toValue: 50,
+        toValue: 0,
           duration: 400,
           useNativeDriver: false,
         }),
@@ -109,7 +111,11 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({
         <Animated.View
           style={[
             styles.toastContainer,
-            { opacity, transform: [{ translateY }] },
+            {
+              top: insets.top + 16,
+              opacity,
+              transform: [{ translateY }],
+            },
           ]}
         >
           <View

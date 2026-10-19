@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import {
   View,
-  Text as NativeText,
   StyleSheet,
   ScrollView,
   Pressable,
@@ -16,9 +15,13 @@ import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "../../context/AuthContext";
 import { useQuery } from "@tanstack/react-query";
 import { AccountApi } from "../../api/generated/endpoints/account-api";
+import { AttendanceApi } from "../../api/generated/endpoints/attendance-api";
+import { AcademicSessionsApi } from "../../api/generated/endpoints/academic-sessions-api";
+import { StudentsApi } from "../../api/generated/endpoints/students-api";
 import { Configuration } from "../../api/generated/configuration";
 import api, { API_BASE_URL } from "../../services/api";
 import { getApiErrorMessage } from "../../utils/apiError";
+import { decodeJwt } from "../../utils/jwt";
 import { UpcomingActivitiesCard } from "./UpcomingActivitiesCard";
 import { useProfileImageUrl } from "../../hooks/useProfileImageUrl";
 
@@ -28,6 +31,70 @@ const accountApi = new AccountApi(
   API_BASE_URL,
   api,
 );
+const attendanceApi = new AttendanceApi(
+  new Configuration({ basePath: API_BASE_URL }),
+  API_BASE_URL,
+  api,
+);
+const academicSessionsApi = new AcademicSessionsApi(
+  new Configuration({ basePath: API_BASE_URL }),
+  API_BASE_URL,
+  api,
+);
+const studentsApi = new StudentsApi(
+  new Configuration({ basePath: API_BASE_URL }),
+  API_BASE_URL,
+  api,
+);
+
+const getLocalDate = () => {
+  const now = new Date();
+  return [
+    now.getFullYear(),
+    String(now.getMonth() + 1).padStart(2, "0"),
+    String(now.getDate()).padStart(2, "0"),
+  ].join("-");
+};
+
+const formatTermName = (name?: string | null) => {
+  const termName = name?.trim();
+  if (!termName) return "Current Term";
+  return /\bterm\b/i.test(termName) ? termName : `${termName} Term`;
+};
+
+const getAssignedClassId = (token: string | null) => {
+  const claims = token
+    ? (decodeJwt(token) as Record<string, unknown> | null)
+    : null;
+  if (!claims) return undefined;
+
+  const normalize = (key: string) => key.toLowerCase().replace(/[^a-z0-9]/g, "");
+  const direct = Object.entries(claims).find(([key]) => {
+    const normalized = normalize(key);
+    return ["assignedclassid", "classid", "homeroomclassid"].some(
+      (name) => normalized === name || normalized.endsWith(name),
+    );
+  })?.[1];
+  if (typeof direct === "string" || typeof direct === "number") {
+    return String(direct).trim() || undefined;
+  }
+
+  const assigned = Object.entries(claims).find(([key]) => {
+    const normalized = normalize(key);
+    return ["assignedclass", "classinfo", "homeroomclass"].some(
+      (name) => normalized === name || normalized.endsWith(name),
+    );
+  })?.[1];
+  const classInfo = Array.isArray(assigned) ? assigned[0] : assigned;
+  if (!classInfo || typeof classInfo !== "object") return undefined;
+  const nested = classInfo as Record<string, unknown>;
+  const id = Object.entries(nested).find(([key]) =>
+    ["classid", "id", "assignedclassid"].includes(normalize(key)),
+  )?.[1];
+  return typeof id === "string" || typeof id === "number"
+    ? String(id).trim() || undefined
+    : undefined;
+};
 
 // Stitch Design Tokens
 const STITCH_COLORS = {
@@ -51,7 +118,7 @@ const STITCH_COLORS = {
 export default function TeacherDashboard() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   const { data: profileImageUrl } = useProfileImageUrl();
 
   // Fetch actual profile data (cached by React Query)
@@ -67,6 +134,107 @@ export default function TeacherDashboard() {
       return response.data.data;
     },
     enabled: !!user,
+  });
+
+  const { data: currentTermName } = useQuery({
+    queryKey: ["dashboard-current-term-name", user?.id],
+    queryFn: async () => {
+      const response = await academicSessionsApi.getCurrentAcademicSession();
+      if (!response.data.success) {
+        throw new Error(getApiErrorMessage(response.data, "Could not load current term."));
+      }
+      return response.data.data?.terms?.find((term) => term.isCurrent)?.name ?? null;
+    },
+    enabled: !!user,
+    retry: false,
+  });
+
+  const isAdmin = user?.backendRole?.toLowerCase().includes("admin") ?? false;
+  const isTeacher = user?.backendRole
+    ?.split(/[,;|]/)
+    .some((role) => role.trim().toLowerCase() === "teacher") ?? false;
+  const assignedClassId = getAssignedClassId(token);
+  const canLoadAttendanceSummary = isAdmin || (isTeacher && !!assignedClassId);
+  const attendanceDate = getLocalDate();
+  const {
+    data: attendanceSummary,
+    isLoading: isAttendanceLoading,
+    isError: isAttendanceError,
+    refetch: refetchAttendance,
+  } = useQuery({
+    queryKey: ["dashboard-class-attendance", user?.id, assignedClassId, attendanceDate],
+    queryFn: async () => {
+      let rosterSize: number;
+      if (isAdmin) {
+        const firstRosterPage = await studentsApi.getStudents({
+          pageNumber: 1,
+          pageSize: 100,
+        });
+        if (firstRosterPage.data.success === false) {
+          throw new Error(getApiErrorMessage(firstRosterPage.data, "Could not load the student list."));
+        }
+        const rosterPages = Math.max(
+          1,
+          firstRosterPage.data.pagination?.totalPages ?? 1,
+        );
+        const remainingRosterPages = await Promise.all(
+          Array.from({ length: rosterPages - 1 }, async (_, index) => {
+            const response = await studentsApi.getStudents({
+              pageNumber: index + 2,
+              pageSize: 100,
+            });
+            if (response.data.success === false) {
+              throw new Error(getApiErrorMessage(response.data, "Could not load the student list."));
+            }
+            return response.data.items ?? [];
+          }),
+        );
+        rosterSize = [
+          ...(firstRosterPage.data.items ?? []),
+          ...remainingRosterPages.flat(),
+        ].length;
+      } else {
+        const classRoster = await studentsApi.getStudentsByClass({
+          classId: assignedClassId!,
+        });
+        if (classRoster.data.success === false) {
+          throw new Error(getApiErrorMessage(classRoster.data, "Could not load the class student list."));
+        }
+        rosterSize = classRoster.data.data?.length ?? 0;
+      }
+
+      const firstPage = await attendanceApi.getClassroomAttendance({
+        classId: isAdmin ? undefined : assignedClassId,
+        fromDate: attendanceDate,
+        pageNumber: 1,
+        pageSize: 500,
+      });
+      if (firstPage.data.success === false) {
+        throw new Error(getApiErrorMessage(firstPage.data, "Could not load today's attendance."));
+      }
+      const totalPages = Math.max(1, firstPage.data.pagination?.totalPages ?? 1);
+      const rest = await Promise.all(
+        Array.from({ length: totalPages - 1 }, async (_, index) => {
+          const response = await attendanceApi.getClassroomAttendance({
+            classId: isAdmin ? undefined : assignedClassId,
+            fromDate: attendanceDate,
+            pageNumber: index + 2,
+            pageSize: 500,
+          });
+          if (response.data.success === false) {
+            throw new Error(getApiErrorMessage(response.data, "Could not load today's attendance."));
+          }
+          return response.data.items ?? [];
+        }),
+      );
+      const records = [...(firstPage.data.items ?? []), ...rest.flat()];
+      return {
+        present: records.filter((record) => record.isInSchool === true).length,
+        total: rosterSize,
+      };
+    },
+    enabled: !!user && canLoadAttendanceSummary,
+    retry: false,
   });
 
   const firstName =
@@ -118,7 +286,7 @@ export default function TeacherDashboard() {
         <View style={styles.mainGreeting}>
           <Text style={styles.greetingTitle}>Good Morning, {firstName}</Text>
           <Text style={styles.greetingSubtitle}>
-            {user?.currentTerm || "Current Term"} • 2 Classes Today
+            {formatTermName(currentTermName)} • 20 Classes Today
           </Text>
         </View>
 
@@ -141,17 +309,32 @@ export default function TeacherDashboard() {
           <View style={styles.heroMiddle}>
             <View style={styles.attendanceStats}>
               <Text style={styles.attendanceValue}>
-                18<Text style={styles.attendanceTotal}>/30</Text>
+                {!canLoadAttendanceSummary || isAttendanceLoading
+                  ? "—"
+                  : isAttendanceError
+                    ? "—"
+                    : attendanceSummary?.present ?? 0}
+                <Text style={styles.attendanceTotal}>
+                  /{attendanceSummary?.total ?? 0}
+                </Text>
               </Text>
               <Text style={styles.attendanceLabel}>Present</Text>
             </View>
-            <View style={styles.attendanceStatsRight}>
-              <Text style={styles.attendanceValueAbsent}>12</Text>
-              <Text style={styles.attendanceLabelAbsent}>Absent</Text>
-            </View>
           </View>
+          {isAttendanceError ? (
+            <Pressable
+              onPress={() => void refetchAttendance()}
+              style={styles.attendanceRetry}
+            >
+              <Text style={styles.linkText}>Could not load attendance · Try again</Text>
+            </Pressable>
+          ) : null}
 
-          <Pressable style={styles.markAttendanceBtn}>
+          <Pressable
+            style={styles.markAttendanceBtn}
+            onPress={() => router.push("/(main)/attendance")}
+            accessibilityRole="button"
+          >
             <Ionicons
               name="checkmark-done"
               size={20}
@@ -235,7 +418,10 @@ export default function TeacherDashboard() {
               <Text style={styles.actionText}>Subjects</Text>
             </Pressable>
 
-            <Pressable style={styles.actionItem}>
+            <Pressable
+              style={styles.actionItem}
+              onPress={() => router.push("/(main)/attendance")}
+            >
               <View style={styles.actionIconContainer}>
                 <Ionicons
                   name="people-outline"
@@ -267,6 +453,7 @@ export default function TeacherDashboard() {
               </View>
               <Text style={styles.actionText}>Notes</Text>
             </Pressable>
+
           </ScrollView>
         </View>
 
@@ -492,6 +679,11 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     letterSpacing: 0.5,
     marginTop: 4,
+  },
+  attendanceRetry: {
+    alignSelf: "flex-start",
+    marginTop: -16,
+    marginBottom: 12,
   },
   attendanceStatsRight: {
     alignItems: "flex-end",

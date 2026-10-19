@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from "react";
 import {
   View,
-  Text as NativeText,
   StyleSheet,
   Pressable,
   Alert,
@@ -110,12 +109,20 @@ export default function AboutScreen() {
         );
       }
     } catch (error: any) {
-      console.error("[About] checkForUpdates Error:", error);
+      const status = error?.response?.status;
+      console.warn("[About] checkForUpdates failed", {
+        status,
+        url: error?.config?.url,
+        message: error?.message,
+      });
       showToast({
-        message: getRequestErrorMessage(
-          error,
-          "Could not check for updates. Please try again later.",
-        ),
+        message:
+          status === 404
+            ? "Update information isn't available right now. Please try again later."
+            : getRequestErrorMessage(
+                error,
+                "Could not check for updates. Please try again later.",
+              ),
         type: "error",
       });
     } finally {
@@ -228,37 +235,26 @@ export default function AboutScreen() {
             </View>
           )}
 
-          <Pressable
-            style={({ pressed }) => [
-              styles.primaryButton,
-              pressed && styles.primaryButtonPressed,
-              (isChecking || isDownloading) && styles.buttonDisabled,
-            ]}
-            onPress={checkForUpdates}
-            disabled={isChecking || isDownloading}
-          >
-            {isChecking ? (
-              <ActivityIndicator color="#FFFFFF" size="small" />
-            ) : (
-              <>
-                <Ionicons name="refresh" size={18} color="#FFFFFF" />
-                <Text style={styles.primaryButtonText}>Check for Updates</Text>
-              </>
-            )}
-          </Pressable>
-
-          <Pressable
-            style={styles.secondaryButton}
-            onPress={() =>
-              showToast({
-                message:
-                  "All third-party libraries used in this app are subject to their respective MIT/Apache licenses.",
-                type: "info",
-              })
-            }
-          >
-            <Text style={styles.secondaryButtonText}>Open Source Licenses</Text>
-          </Pressable>
+          {Platform.OS !== "web" && (
+            <Pressable
+              style={({ pressed }) => [
+                styles.primaryButton,
+                pressed && styles.primaryButtonPressed,
+                (isChecking || isDownloading) && styles.buttonDisabled,
+              ]}
+              onPress={checkForUpdates}
+              disabled={isChecking || isDownloading}
+            >
+              {isChecking ? (
+                <ActivityIndicator color="#FFFFFF" size="small" />
+              ) : (
+                <>
+                  <Ionicons name="refresh" size={18} color="#FFFFFF" />
+                  <Text style={styles.primaryButtonText}>Check for Updates</Text>
+                </>
+              )}
+            </Pressable>
+          )}
         </View>
 
         <Text style={styles.copyrightText}>
@@ -444,17 +440,6 @@ const styles = StyleSheet.create({
   },
   buttonDisabled: {
     opacity: 0.6,
-  },
-  secondaryButton: {
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 12,
-  },
-  secondaryButtonText: {
-    color: "#64748B",
-    fontSize: 14,
-    fontWeight: "600",
-    textDecorationLine: "underline",
   },
   copyrightText: {
     textAlign: "center",

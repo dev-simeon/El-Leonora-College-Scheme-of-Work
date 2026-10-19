@@ -31,7 +31,10 @@ import { AttendanceApi } from "../../src/api/generated/endpoints/attendance-api"
 import { TermsApi } from "../../src/api/generated/endpoints/terms-api";
 import { GetTermActivitiesFilterEnum } from "../../src/api/generated/endpoints/terms-api";
 import { AcademicSessionsApi } from "../../src/api/generated/endpoints/academic-sessions-api";
-import { StaffsApi } from "../../src/api/generated/endpoints/staffs-api";
+import {
+  GetStaffsRoleEnum,
+  StaffsApi,
+} from "../../src/api/generated/endpoints/staffs-api";
 import {
   RecordGateAttendanceRequestGateReasonEnum,
   RecordGateAttendanceRequestGateTypeEnum,
@@ -40,6 +43,11 @@ import { ClassroomAttendanceItemStatusEnum } from "../../src/api/generated/model
 import type { BulkClassroomAttendanceRequest } from "../../src/api/generated/models/bulk-classroom-attendance-request";
 import { Configuration } from "../../src/api/generated/configuration";
 import api, { API_BASE_URL } from "../../src/services/api";
+import { StorageService } from "../../src/services/storage";
+import {
+  StaffGateAttendanceRequestGateReasonEnum,
+  StaffGateAttendanceRequestGateTypeEnum,
+} from "../../src/api/generated/models/staff-gate-attendance-request";
 import {
   getApiErrorMessage,
   getRequestErrorMessage,
@@ -58,10 +66,6 @@ type ClassOption = { id: string; label: string; itemKey: string };
 type CheckoutOption = "day" | "reason";
 type SuccessAction = "check_in" | "check_out";
 const manualAttendanceByClass = new Map<string, string[]>();
-const STAFF: Person[] = [
-  { id: "STF-2024-001", name: "Dr. Sarah Johnson" },
-  { id: "STF-2024-002", name: "Prof. Michael Smith" },
-];
 const CHECK_IN_STUDENTS: Person[] = [
   {
     id: "student-1",
@@ -129,6 +133,32 @@ const REASONS = [
   },
   { label: "Other", value: RecordGateAttendanceRequestGateReasonEnum.Other },
 ] as const;
+const APPROVER_STAFF_ROLES = [
+  GetStaffsRoleEnum.Proprietor,
+  GetStaffsRoleEnum.Chairman,
+  GetStaffsRoleEnum.Principal,
+  GetStaffsRoleEnum.VicePrincipal,
+  GetStaffsRoleEnum.AdminOfficer,
+];
+const STAFF_GATE_QR_VALUE = "schoolcompanion://attendance/gate/ELN-01";
+const STAFF_GATE_CODE = STAFF_GATE_QR_VALUE.split("/").pop()!;
+const staffGateStateKey = (staffId: string) =>
+  `attendance.staff.${staffId}.isInSchool`;
+const STAFF_CHECKOUT_REASONS = [
+  { label: "School Event", value: StaffGateAttendanceRequestGateReasonEnum.SchoolEvent },
+  { label: "School Errand", value: StaffGateAttendanceRequestGateReasonEnum.SchoolErrand },
+  { label: "Medical", value: StaffGateAttendanceRequestGateReasonEnum.Medical },
+  { label: "Early Check-Out", value: StaffGateAttendanceRequestGateReasonEnum.EarlyCheckOut },
+  { label: "School Closed", value: StaffGateAttendanceRequestGateReasonEnum.SchoolClosed },
+  { label: "Other", value: StaffGateAttendanceRequestGateReasonEnum.Other },
+];
+const decodeQrBase64 = (value: string) => {
+  try {
+    return globalThis.atob(value.trim()).trim();
+  } catch {
+    return null;
+  }
+};
 const classesApi = new ClassesApi(
   new Configuration({ basePath: API_BASE_URL }),
   API_BASE_URL,
@@ -328,6 +358,8 @@ export default function AttendanceScreen() {
   const [scannerError, setScannerError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
+  const [staffCheckoutOpen, setStaffCheckoutOpen] = useState(false);
+  const [staffGateCode, setStaffGateCode] = useState<string | null>(null);
   const [success, setSuccess] = useState<{
     action: SuccessAction;
     timestamp: Date;
@@ -355,9 +387,16 @@ export default function AttendanceScreen() {
   const [assignmentLoading, setAssignmentLoading] = useState(true);
   const [gateCheckIns, setGateCheckIns] = useState<Person[]>([]);
   const [gateCheckInsLoading, setGateCheckInsLoading] = useState(false);
+  const [studentPresentCount, setStudentPresentCount] = useState(0);
+  const [studentTotalCount, setStudentTotalCount] = useState(0);
+  const [staffGateCheckIns, setStaffGateCheckIns] = useState<Person[]>([]);
+  const [staffGateCheckInsLoading, setStaffGateCheckInsLoading] = useState(false);
+  const [staffPresentCount, setStaffPresentCount] = useState(0);
+  const [staffTotalCount, setStaffTotalCount] = useState(0);
   const [actionsOpen, setActionsOpen] = useState(false);
   const actionsProgress = useRef(new Animated.Value(0)).current;
   const scanLock = useRef(false);
+  const classAdmissionsCache = useRef(new Map<string, Set<string>>());
   const isWeb = Platform.OS === "web";
   const isAdmin = user?.backendRole?.toLowerCase().includes("admin") ?? false;
   const isTeacher =
@@ -365,24 +404,41 @@ export default function AttendanceScreen() {
       ?.split(/[,;|]/)
       .some((role) => role.trim().toLowerCase() === "teacher") ?? false;
   const assignedClass = getAssignedClassFromToken(token);
+  const staffGateKey = user?.id ? staffGateStateKey(user.id) : null;
   const canSeeGateCheckIns = isAdmin;
-  const normalList = activeTab === "Students" ? gateCheckIns : STAFF;
+  const canLoadStudentSummary = isAdmin || (isTeacher && Boolean(assignedClass?.id));
+  const normalList = activeTab === "Students" ? gateCheckIns : staffGateCheckIns;
   const selectedClass = classes.find((item) => item.id === selectedClassId);
-  const summary =
-    activeTab === "Students"
-      ? `${gateCheckIns.filter((student) => student.isInSchool).length}/${gateCheckIns.length}`
-      : "2/12";
+  const summary = activeTab === "Students"
+    ? `${studentPresentCount}/${studentTotalCount}`
+    : `${staffPresentCount}/${staffTotalCount}`;
 
   useEffect(() => {
     if (user && user.role === "student") router.replace("/(main)/home");
     else if (user && !isAdmin && !isTeacher) router.replace("/(main)/home");
   }, [router, user, isAdmin, isTeacher]);
   useEffect(() => {
+    let active = true;
+    if (!staffGateKey) return;
+    void (async () => {
+      try {
+        const saved = await StorageService.getItem(staffGateKey);
+        if (!active) return;
+        if (saved === null) await StorageService.setItem(staffGateKey, "false");
+      } catch (error) {
+        console.error("[Staff Attendance Storage] Failed to load gate state", error);
+      }
+    })();
+    return () => { active = false; };
+  }, [staffGateKey]);
+  useEffect(() => {
     if (!user || (!isAdmin && !isTeacher)) {
       setAssignmentLoading(false);
       setHasClassAssignment(false);
       setClasses([]);
       setGateCheckIns([]);
+      setStudentPresentCount(0);
+      setStudentTotalCount(0);
       return;
     }
 
@@ -404,6 +460,7 @@ export default function AttendanceScreen() {
       setSelectedClassId(assignedOption.id);
       setHasClassAssignment(true);
       setAssignmentLoading(false);
+      void loadGateCheckIns();
       return;
     }
 
@@ -413,6 +470,8 @@ export default function AttendanceScreen() {
     setHasClassAssignment(false);
     setAssignmentLoading(false);
     setGateCheckIns([]);
+    setStudentPresentCount(0);
+    setStudentTotalCount(0);
     setGateCheckInsLoading(false);
   }, [
     user?.id,
@@ -439,9 +498,11 @@ export default function AttendanceScreen() {
     setSuccess(null);
     setUserId(null);
     setScannedStudent(null);
+    setStaffGateCode(null);
     resetCheckout();
   };
   const openScanner = async () => {
+    closeActions();
     scanLock.current = false;
     setScannerError(null);
 
@@ -477,7 +538,94 @@ export default function AttendanceScreen() {
       });
     }
   };
+  const scanStaffGate = async (decodedGateCode: string) => {
+    if (!isTeacher && !isAdmin) {
+      showToast({ message: "Staff attendance is available to staff accounts only.", type: "error" });
+      return;
+    }
+    if (!staffGateKey) {
+      showToast({ message: "Could not identify the signed-in staff account.", type: "error" });
+      return;
+    }
+    setLoading(true);
+    setScannerError(null);
+    try {
+      const storedState = await StorageService.getItem(staffGateKey);
+      const isInSchool = storedState === "true";
+      setStaffGateCode(STAFF_GATE_CODE);
+      if (isInSchool) {
+        setScannerOpen(false);
+        setStaffCheckoutOpen(true);
+        return;
+      }
+
+      const requestBody = {
+        gateCode: STAFF_GATE_CODE,
+        gateType: StaffGateAttendanceRequestGateTypeEnum.CheckIn,
+      };
+      console.log("[Staff Gate Check-In API] Request", {
+        method: "POST",
+        baseUrl: API_BASE_URL,
+        path: "/api/Attendance/staffs/gate",
+        body: requestBody,
+      });
+      const response = await attendanceApi.recordStaffGateAttendance({
+        staffGateAttendanceRequest: requestBody,
+      });
+      console.log("[Staff Gate Check-In API] Response", {
+        httpStatus: response.status,
+        data: response.data,
+      });
+      if (response.data.success !== true) {
+        const apiError = new Error(
+          getApiErrorMessage(response.data, "Could not record staff check-in."),
+        ) as Error & { apiResponse?: unknown };
+        apiError.apiResponse = response.data;
+        throw apiError;
+      }
+      await updateStaffGateState(true);
+      if (canSeeGateCheckIns) void loadStaffGateCheckIns();
+      setScannerOpen(false);
+      setSuccess({ action: "check_in", timestamp: new Date() });
+    } catch (error) {
+      const requestError = error as any;
+      console.log("[Staff Gate Check-In API] Request failed", {
+        httpStatus: requestError?.response?.status,
+        url: requestError?.config?.url,
+        method: requestError?.config?.method,
+        response: requestError?.apiResponse ?? requestError?.response?.data,
+        message: getRequestErrorMessage(error, "Could not record staff check-in."),
+      });
+      const message = getRequestErrorMessage(error, "Could not record staff check-in.");
+      if (scannerOpen) setScannerError(message);
+      showToast({ message, type: "error" });
+    } finally {
+      setLoading(false);
+      scanLock.current = false;
+    }
+  };
+  const updateStaffGateState = async (isInSchool: boolean) => {
+    if (!staffGateKey) return;
+    try {
+      await StorageService.setItem(staffGateKey, String(isInSchool));
+    } catch (error) {
+      console.error("[Staff Attendance Storage] Failed to save gate state", error);
+      showToast({
+        message: "Attendance was recorded, but this device could not save your gate status.",
+        type: "error",
+      });
+    }
+  };
   const scan = async ({ data }: { data: string }) => {
+    closeActions();
+    const decodedGateQr = decodeQrBase64(data);
+    if (decodedGateQr === STAFF_GATE_QR_VALUE) {
+      if (scanLock.current) return;
+      scanLock.current = true;
+      await scanStaffGate(decodedGateQr);
+      scanLock.current = false;
+      return;
+    }
     const qr = parseStudentQr(data);
     const scannedAdmissionNo = qr.admissionNumber?.trim();
     // Student admission numbers without the STU prefix use underscores in the
@@ -506,6 +654,31 @@ export default function AttendanceScreen() {
         throw new Error(
           "Staff QR attendance is not supported by the student attendance API.",
         );
+      }
+      if (isTeacher && !isAdmin) {
+        if (!assignedClass?.id) {
+          throw new Error("You need an assigned class to scan student attendance.");
+        }
+        let classAdmissions = classAdmissionsCache.current.get(assignedClass.id);
+        if (!classAdmissions) {
+          const classRoster = await studentsApi.getStudentsByClass({
+            classId: assignedClass.id,
+          });
+          classAdmissions = new Set(
+            (classRoster.data.data ?? [])
+              .map((student: any) => String(student.admissionNumber ?? "").trim())
+              .filter(Boolean)
+              .map((admissionNumber) =>
+                /stu/i.test(admissionNumber)
+                  ? admissionNumber
+                  : admissionNumber.replace(/\//g, "_"),
+              ),
+          );
+          classAdmissionsCache.current.set(assignedClass.id, classAdmissions);
+        }
+        if (!classAdmissions.has(studentAdmissionNo)) {
+          throw new Error("You can only scan students assigned to your class.");
+        }
       }
       const statusRequest = { studentAdmissionNo };
       const statusPath = `/api/Attendance/students/${encodeURIComponent(studentAdmissionNo)}/status`;
@@ -581,12 +754,11 @@ export default function AttendanceScreen() {
           apiError.apiResponse = recordResponse.data;
           throw apiError;
         }
-        if (canSeeGateCheckIns) void loadGateCheckIns();
-        const recordedAt = recordResponse.data.data?.lastAttendanceAt;
+        if (canLoadStudentSummary) void loadGateCheckIns();
         setScannerOpen(false);
         setSuccess({
           action: "check_in",
-          timestamp: recordedAt ? new Date(recordedAt) : new Date(),
+          timestamp: new Date(),
         });
       }
     } catch (error) {
@@ -620,18 +792,41 @@ export default function AttendanceScreen() {
     Boolean(selectedReason) &&
     (selectedReason !== RecordGateAttendanceRequestGateReasonEnum.Other ||
       Boolean(otherReason.trim()));
-  const submitCheckout = async (_eventDetails?: {
+  const submitCheckout = async (checkoutDetails?: {
     schoolEventId?: string;
+    accompaniedByStaffId?: string;
     approvedByStaffId?: string;
+    destination?: string;
+    otherReason?: string;
+    extraNotes?: string;
   }) => {
     if (!userId || !canSubmit) return;
     const requestBody = {
       studentAdmissionNo: userId,
       gateType: RecordGateAttendanceRequestGateTypeEnum.CheckOut,
       gateReason: selectedReason,
-      ...(selectedReason === RecordGateAttendanceRequestGateReasonEnum.Other
-        ? { otherReason: otherReason.trim() }
+      ...(selectedReason !==
+      RecordGateAttendanceRequestGateReasonEnum.SchoolClosed
+        ? { approvedByStaffId: checkoutDetails?.approvedByStaffId }
         : {}),
+      ...(selectedReason ===
+      RecordGateAttendanceRequestGateReasonEnum.SchoolEvent
+        ? {
+            schoolEvent: {
+              eventId: checkoutDetails?.schoolEventId,
+              accompaniedByStaffId: checkoutDetails?.accompaniedByStaffId,
+            },
+            extraNotes: checkoutDetails?.extraNotes,
+          }
+        : selectedReason === RecordGateAttendanceRequestGateReasonEnum.Other
+          ? {
+              destination: checkoutDetails?.destination?.trim(),
+              otherReason: checkoutDetails?.otherReason?.trim(),
+            }
+          : {
+              destination: checkoutDetails?.destination?.trim(),
+              extraNotes: checkoutDetails?.extraNotes?.trim(),
+            }),
     };
     setLoading(true);
     try {
@@ -661,15 +856,13 @@ export default function AttendanceScreen() {
       setCheckoutOpen(false);
       setSuccess({
         action: "check_out",
-        timestamp: response.data.data?.lastAttendanceAt
-          ? new Date(response.data.data.lastAttendanceAt)
-          : new Date(),
+        timestamp: new Date(),
         reason:
           selectedReason === RecordGateAttendanceRequestGateReasonEnum.Other
             ? otherReason.trim()
             : REASONS.find((item) => item.value === selectedReason)?.label,
       });
-      if (canSeeGateCheckIns) void loadGateCheckIns();
+      if (canLoadStudentSummary) void loadGateCheckIns();
     } catch (error) {
       const requestError = error as any;
       console.log("[Attendance Check-Out API] Request failed", {
@@ -687,6 +880,77 @@ export default function AttendanceScreen() {
           error,
           "Could not record the student's checkout.",
         ),
+        type: "error",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+  const submitStaffCheckout = async (checkoutDetails: {
+    reason: StaffGateAttendanceRequestGateReasonEnum;
+    otherReason?: string;
+    schoolEventId?: string;
+    extraNote?: string;
+  }) => {
+    if (!staffGateCode || !staffGateKey) return;
+    const requestBody = {
+      gateCode: staffGateCode,
+      gateType: StaffGateAttendanceRequestGateTypeEnum.CheckOut,
+      gateReason: checkoutDetails.reason,
+      ...(checkoutDetails.reason === StaffGateAttendanceRequestGateReasonEnum.Other
+        ? { otherReason: checkoutDetails.otherReason?.trim() }
+        : {}),
+      ...(checkoutDetails.reason === StaffGateAttendanceRequestGateReasonEnum.SchoolEvent
+        ? { schoolEventId: checkoutDetails.schoolEventId }
+        : {}),
+      ...(checkoutDetails.reason !== StaffGateAttendanceRequestGateReasonEnum.Other && checkoutDetails.extraNote?.trim()
+        ? { extraNote: checkoutDetails.extraNote.trim() }
+        : {}),
+    };
+    setLoading(true);
+    try {
+      console.log("[Staff Gate Check-Out API] Request", {
+        method: "POST",
+        baseUrl: API_BASE_URL,
+        path: "/api/Attendance/staffs/gate",
+        body: requestBody,
+      });
+      const response = await attendanceApi.recordStaffGateAttendance({
+        staffGateAttendanceRequest: requestBody,
+      });
+      console.log("[Staff Gate Check-Out API] Response", {
+        httpStatus: response.status,
+        data: response.data,
+      });
+      if (response.data.success !== true) {
+        const apiError = new Error(
+          getApiErrorMessage(response.data, "Could not record staff check-out."),
+        ) as Error & { apiResponse?: unknown };
+        apiError.apiResponse = response.data;
+        throw apiError;
+      }
+      await updateStaffGateState(false);
+      if (canSeeGateCheckIns) void loadStaffGateCheckIns();
+      setStaffCheckoutOpen(false);
+      setSuccess({
+        action: "check_out",
+        timestamp: new Date(),
+        reason:
+          checkoutDetails.reason === StaffGateAttendanceRequestGateReasonEnum.Other
+            ? checkoutDetails.otherReason?.trim()
+            : checkoutDetails.reason,
+      });
+    } catch (error) {
+      const requestError = error as any;
+      console.log("[Staff Gate Check-Out API] Request failed", {
+        httpStatus: requestError?.response?.status,
+        url: requestError?.config?.url,
+        method: requestError?.config?.method,
+        response: requestError?.apiResponse ?? requestError?.response?.data,
+        message: getRequestErrorMessage(error, "Could not record staff check-out."),
+      });
+      showToast({
+        message: getRequestErrorMessage(error, "Could not record staff check-out."),
         type: "error",
       });
     } finally {
@@ -716,8 +980,10 @@ export default function AttendanceScreen() {
     setManualMode(true);
   };
   const loadGateCheckIns = async () => {
-    if (!canSeeGateCheckIns) {
+    if (!canLoadStudentSummary) {
       setGateCheckIns([]);
+      setStudentPresentCount(0);
+      setStudentTotalCount(0);
       setGateCheckInsLoading(false);
       return;
     }
@@ -783,26 +1049,34 @@ export default function AttendanceScreen() {
       // admission number used by this screen. Resolve admission numbers from
       // the student directory and join by database student id.
       requestStage = "student directory lookup";
-      const studentPage = await studentsApi.getStudents({
-        pageNumber: 1,
-        pageSize: 100,
-      });
-      const studentPages = Math.max(
-        1,
-        studentPage.data.pagination?.totalPages ?? 1,
-      );
-      const studentRest = await Promise.all(
-        Array.from({ length: studentPages - 1 }, async (_, index) => {
-          const pageNumber = index + 2;
-          const response = await studentsApi.getStudents({
-            pageNumber,
-            pageSize: 100,
-          });
-          return response;
-        }),
-      );
-      const students = [studentPage, ...studentRest].flatMap(
-        (response) => response.data.items ?? [],
+      let students: any[];
+      if (isAdmin) {
+        const studentPage = await studentsApi.getStudents({
+          pageNumber: 1,
+          pageSize: 100,
+        });
+        const studentPages = Math.max(
+          1,
+          studentPage.data.pagination?.totalPages ?? 1,
+        );
+        const studentRest = await Promise.all(
+          Array.from({ length: studentPages - 1 }, async (_, index) => {
+            const pageNumber = index + 2;
+            return studentsApi.getStudents({ pageNumber, pageSize: 100 });
+          }),
+        );
+        students = [studentPage, ...studentRest].flatMap(
+          (response) => response.data.items ?? [],
+        );
+      } else {
+        const classStudents = await studentsApi.getStudentsByClass({
+          classId: assignedClass!.id,
+        });
+        students = classStudents.data.data ?? [];
+      }
+      setStudentTotalCount(students.length);
+      setStudentPresentCount(
+        records.filter((record: any) => record.isInSchool === true).length,
       );
       const studentById = new Map(
         students.map((student: any) => [String(student.id), student]),
@@ -846,6 +1120,108 @@ export default function AttendanceScreen() {
       });
     } finally {
       setGateCheckInsLoading(false);
+    }
+  };
+  const loadStaffGateCheckIns = async () => {
+    if (!canSeeGateCheckIns) {
+      setStaffGateCheckIns([]);
+      setStaffGateCheckInsLoading(false);
+      return;
+    }
+
+    setStaffGateCheckInsLoading(true);
+    try {
+      const now = new Date();
+      const fromDate = [
+        now.getFullYear(),
+        String(now.getMonth() + 1).padStart(2, "0"),
+        String(now.getDate()).padStart(2, "0"),
+      ].join("-");
+      const response = await attendanceApi.getStaffsAttendance({
+        fromDate,
+        pageNumber: 1,
+        pageSize: 500,
+      });
+      if (response.data.success === false) {
+        throw new Error(response.data.message || "Could not load staff check-ins.");
+      }
+      const staffAttendancePages = Math.max(1, response.data.pagination?.totalPages ?? 1);
+      const additionalAttendancePages = await Promise.all(
+        Array.from({ length: staffAttendancePages - 1 }, (_, index) =>
+          attendanceApi.getStaffsAttendance({
+            fromDate,
+            pageNumber: index + 2,
+            pageSize: 500,
+          }),
+        ),
+      );
+      const records = [response, ...additionalAttendancePages].flatMap(
+        (page) => page.data.items ?? [],
+      );
+      const firstStaffPage = await staffsApi.getStaffs({ pageNumber: 1, pageSize: 500 });
+      if (firstStaffPage.data.success === false) {
+        throw new Error(firstStaffPage.data.message || "Could not load staff directory.");
+      }
+      const staffPages = Math.max(1, firstStaffPage.data.pagination?.totalPages ?? 1);
+      const additionalStaffPages = await Promise.all(
+        Array.from({ length: staffPages - 1 }, (_, index) =>
+          staffsApi.getStaffs({ pageNumber: index + 2, pageSize: 500 }),
+        ),
+      );
+      const allStaff = [firstStaffPage, ...additionalStaffPages].flatMap(
+        (page) => page.data.items ?? [],
+      );
+      const staffById = new Map(allStaff.map((staff) => [String(staff.id ?? ""), staff]));
+      setStaffTotalCount(allStaff.filter((staff) => staff.isActive !== false).length);
+      setStaffPresentCount(records.filter((record) => record.isInSchool === true).length);
+      const mappedStaff = await Promise.all(
+        records.map(async (record, index) => {
+          const staffId = String(record.staffId ?? "").trim();
+          const directoryRecord = staffById.get(staffId);
+          const attendanceRecord = record as any;
+          let staffNo =
+            attendanceRecord.staffNo?.trim() ||
+            attendanceRecord.staffNumber?.trim() ||
+            directoryRecord?.staffNo?.trim();
+
+          // Some attendance payloads reference a staff account that is missing
+          // from the directory page. Resolve that person's display staff number
+          // from the staff detail endpoint before omitting the subtitle.
+          if (!staffNo && staffId) {
+            try {
+              const detail = await staffsApi.getStaffById({ id: staffId });
+              if (detail.data.success !== false) {
+                staffNo = detail.data.data?.staffNo?.trim();
+              }
+            } catch {
+              // Keep the check-in row visible; the staff number is optional.
+            }
+          }
+
+          return {
+            id: staffId || `staff-${index}`,
+            name: formatPersonName(
+              record.staffFullName ||
+                [directoryRecord?.firstName, directoryRecord?.lastName]
+                  .filter(Boolean)
+                  .join(" ") || "Staff member",
+            ),
+            admissionNumber: staffNo || undefined,
+            isInSchool:
+              typeof record.isInSchool === "boolean"
+                ? record.isInSchool
+                : undefined,
+          };
+        }),
+      );
+      setStaffGateCheckIns(mappedStaff);
+    } catch (error) {
+      showToast({
+        message: getRequestErrorMessage(error, "Could not load staff check-ins."),
+        type: "error",
+      });
+    } finally {
+      setStaffGateCheckInsLoading(false);
     }
   };
   const loadAllowedClasses = async () => {
@@ -1028,6 +1404,9 @@ export default function AttendanceScreen() {
         insets={insets}
         loadingAssignment={assignmentLoading}
         canLoadSchoolEventOptions={isAdmin || isTeacher}
+        showStudentSummaryCard={isTeacher && hasClassAssignment}
+        studentSummary={summary}
+        summaryLoading={gateCheckInsLoading}
         scannerOpen={scannerOpen}
         scannerError={scannerError}
         loading={loading}
@@ -1061,6 +1440,11 @@ export default function AttendanceScreen() {
         onOther={setOtherReason}
         onReasonMenu={() => setReasonMenuOpen(!reasonMenuOpen)}
         onSubmitCheckout={submitCheckout}
+        staffCheckoutOpen={staffCheckoutOpen}
+        staffLoading={loading}
+        staffTermId={user?.currentTermId ?? "2"}
+        onCloseStaffCheckout={() => !loading && setStaffCheckoutOpen(false)}
+        onSubmitStaffCheckout={submitStaffCheckout}
         onDone={dismissSuccess}
       />
     );
@@ -1078,7 +1462,11 @@ export default function AttendanceScreen() {
             <TouchableOpacity
               key={tab}
               style={[styles.tab, activeTab === tab && styles.activeTab]}
-              onPress={() => setActiveTab(tab)}
+              onPress={() => {
+                closeActions();
+                setActiveTab(tab);
+                if (tab === "Staff") void loadStaffGateCheckIns();
+              }}
             >
               <Text
                 style={[
@@ -1103,12 +1491,22 @@ export default function AttendanceScreen() {
           <>
             <TouchableOpacity style={styles.summaryCard} onPress={openScanner}>
               <Text style={styles.summaryLabel}>
-                SCAN QR TO CHECK IN OR OUT
+                {activeTab === "Students"
+                  ? "SCAN QR TO CHECK IN OR OUT"
+                  : "STAFF CHECK-INS TODAY"}
               </Text>
-              <Text style={styles.summaryValue}>{summary}</Text>
+              {(activeTab === "Students" ? gateCheckInsLoading : staffGateCheckInsLoading) ? (
+                <ActivityIndicator color="#FFF" style={{ alignSelf: "flex-start", marginVertical: 12 }} />
+              ) : (
+                <Text style={styles.summaryValue}>{summary}</Text>
+              )}
               <View style={styles.scanHint}>
                 <Ionicons name="qr-code-outline" size={16} color="#FFF" />
-                <Text style={styles.scanHintText}>Tap to scan attendance</Text>
+                  <Text style={styles.scanHintText}>
+                    {activeTab === "Students"
+                      ? "Tap to scan attendance"
+                      : "Tap to scan staff attendance"}
+                  </Text>
               </View>
               <Ionicons
                 name="school"
@@ -1131,9 +1529,19 @@ export default function AttendanceScreen() {
                 No gate check-ins recorded today.
               </Text>
             )
-          ) : null
+          ) : staffGateCheckInsLoading ? (
+            <ActivityIndicator color={COLORS.primary} style={styles.loader} />
+          ) : (
+            <Text style={styles.noStudents}>No staff check-ins recorded today.</Text>
+          )
         }
-        renderItem={({ item }) => <PersonCard person={item} />}
+        renderItem={({ item }) => (
+          <PersonCard
+            person={item}
+            showIdentifier={activeTab === "Students" || Boolean(item.admissionNumber)}
+            alignTextTop={activeTab === "Staff"}
+          />
+        )}
       />
       <View
         style={[styles.speedDial, { bottom: Math.max(insets.bottom - 10, 18) }]}
@@ -1211,11 +1619,14 @@ export default function AttendanceScreen() {
         onMenu={() => setReasonMenuOpen(!reasonMenuOpen)}
         onSubmit={submitCheckout}
       />
-      <SuccessModal
-        success={success}
-        copy={copy}
-        onDone={dismissSuccess}
+      <StaffCheckoutModal
+        visible={staffCheckoutOpen}
+        loading={loading}
+        termId={user?.currentTermId ?? "2"}
+        onClose={() => !loading && setStaffCheckoutOpen(false)}
+        onSubmit={submitStaffCheckout}
       />
+      <SuccessModal success={success} copy={copy} onDone={dismissSuccess} />
     </View>
   );
 }
@@ -1368,6 +1779,9 @@ function ScanOnlyView({
   insets,
   loadingAssignment,
   canLoadSchoolEventOptions,
+  showStudentSummaryCard,
+  studentSummary,
+  summaryLoading,
   scannerOpen,
   scannerError,
   loading,
@@ -1393,6 +1807,11 @@ function ScanOnlyView({
   onOther,
   onReasonMenu,
   onSubmitCheckout,
+  staffCheckoutOpen,
+  staffLoading,
+  staffTermId,
+  onCloseStaffCheckout,
+  onSubmitStaffCheckout,
   onDone,
 }: any) {
   const copy =
@@ -1412,22 +1831,40 @@ function ScanOnlyView({
           <ActivityIndicator size="large" color={COLORS.primary} />
         ) : (
           <>
-            <View style={styles.qrIllustration}>
-              <Ionicons
-                name="qr-code-outline"
-                size={92}
-                color={COLORS.primary}
-              />
-            </View>
-            <Text style={styles.scanOnlyTitle}>Scan Student QR Code</Text>
-            <Text style={styles.scanOnlyBody}>
-              Tap the scan button below, then point your camera at a student's
-              attendance QR code.
-            </Text>
-            <TouchableOpacity style={styles.scanOnlyButton} onPress={onScan}>
-              <Ionicons name="qr-code-outline" size={22} color="#FFF" />
-              <Text style={styles.doneButtonText}>Scan QR Code</Text>
-            </TouchableOpacity>
+            {showStudentSummaryCard ? (
+              <TouchableOpacity style={styles.summaryCard} onPress={onScan}>
+                <Text style={styles.summaryLabel}>YOUR CLASS CHECK-INS</Text>
+                {summaryLoading ? (
+                  <ActivityIndicator color="#FFF" style={{ alignSelf: "flex-start", marginVertical: 12 }} />
+                ) : (
+                  <Text style={styles.summaryValue}>{studentSummary}</Text>
+                )}
+                <View style={styles.scanHint}>
+                  <Ionicons name="qr-code-outline" size={16} color="#FFF" />
+                  <Text style={styles.scanHintText}>Tap to scan student attendance</Text>
+                </View>
+                <Ionicons
+                  name="school"
+                  size={120}
+                  color="rgba(255,255,255,.1)"
+                  style={styles.summaryIcon}
+                />
+              </TouchableOpacity>
+            ) : (
+              <>
+                <View style={styles.qrIllustration}>
+                  <Ionicons name="qr-code-outline" size={92} color={COLORS.primary} />
+                </View>
+                <Text style={styles.scanOnlyTitle}>Scan Student QR Code</Text>
+                <Text style={styles.scanOnlyBody}>
+                  Tap the scan button below, then point your camera at a student's attendance QR code.
+                </Text>
+                <TouchableOpacity style={styles.scanOnlyButton} onPress={onScan}>
+                  <Ionicons name="qr-code-outline" size={22} color="#FFF" />
+                  <Text style={styles.doneButtonText}>Scan QR Code</Text>
+                </TouchableOpacity>
+              </>
+            )}
             {showManualAction && (
               <TouchableOpacity
                 style={styles.manualOnlyButton}
@@ -1473,26 +1910,304 @@ function ScanOnlyView({
         onMenu={onReasonMenu}
         onSubmit={onSubmitCheckout}
       />
-      <SuccessModal
-        success={success}
-        copy={copy}
-        onDone={onDone}
+      <StaffCheckoutModal
+        visible={staffCheckoutOpen}
+        loading={staffLoading}
+        termId={staffTermId}
+        onClose={onCloseStaffCheckout}
+        onSubmit={onSubmitStaffCheckout}
       />
+      <SuccessModal success={success} copy={copy} onDone={onDone} />
     </View>
   );
 }
-function PersonCard({ person }: { person: Person }) {
+function StaffCheckoutModal({ visible, loading, termId, onClose, onSubmit }: any) {
+  const [reason, setReason] = useState<StaffGateAttendanceRequestGateReasonEnum | null>(null);
+  const [otherReason, setOtherReason] = useState("");
+  const [extraNote, setExtraNote] = useState("");
+  const [textEntryModalOpen, setTextEntryModalOpen] = useState(false);
+  const [textEntryType, setTextEntryType] = useState<"otherReason" | "extraNote">("extraNote");
+  const [eventModalOpen, setEventModalOpen] = useState(false);
+  const [events, setEvents] = useState<{ id: string; label: string }[]>([]);
+  const [eventId, setEventId] = useState<string | null>(null);
+  const [eventLoading, setEventLoading] = useState(false);
+  const [eventError, setEventError] = useState<string | null>(null);
+  const [eventMenuOpen, setEventMenuOpen] = useState(false);
+  const [eventsLoaded, setEventsLoaded] = useState(false);
+  const [eventReloadKey, setEventReloadKey] = useState(0);
+  const eventRequestStarted = useRef(false);
+  const selectedEvent = events.find((item) => item.id === eventId);
+  const isOther = reason === StaffGateAttendanceRequestGateReasonEnum.Other;
+  const isSchoolEvent = reason === StaffGateAttendanceRequestGateReasonEnum.SchoolEvent;
+
+  useEffect(() => {
+    if (!visible) return;
+    setReason(null);
+    setOtherReason("");
+    setExtraNote("");
+    setTextEntryModalOpen(false);
+    setEventModalOpen(false);
+    setEventId(null);
+    setEventMenuOpen(false);
+  }, [visible]);
+
+  useEffect(() => {
+    if (!visible || eventsLoaded || eventRequestStarted.current) return;
+    eventRequestStarted.current = true;
+    void (async () => {
+      setEventLoading(true);
+      setEventError(null);
+      try {
+        const session = await academicSessionsApi.getCurrentAcademicSession();
+        if (session.data.success === false) {
+          throw new Error(session.data.message || "Could not load the current term.");
+        }
+        const currentTermId = session.data.data?.terms?.find((term) => term.isCurrent)?.id;
+        const resolvedTermId = currentTermId || (termId && !/^\d+$/.test(termId) ? termId : undefined);
+        if (!resolvedTermId) throw new Error("Could not find the current term.");
+        const response = await termsApi.getTermActivities({
+          termId: resolvedTermId,
+          filter: GetTermActivitiesFilterEnum.All,
+          pageNumber: 1,
+          pageSize: 100,
+        });
+        if (response.data.success === false) {
+          throw new Error(response.data.message || "Could not load school events.");
+        }
+        setEvents((response.data.items ?? []).map((event: any) => ({
+          id: event.id ?? "",
+          label: event.title ?? "School event",
+        })).filter((event) => event.id));
+        setEventsLoaded(true);
+      } catch (error) {
+        setEventError(getRequestErrorMessage(error, "Could not load school events."));
+      } finally {
+        eventRequestStarted.current = false;
+        setEventLoading(false);
+      }
+    })();
+  }, [visible, eventsLoaded, eventReloadKey, termId]);
+
+  const canSubmit = Boolean(reason) &&
+    (!isOther || Boolean(otherReason.trim())) &&
+    (!isSchoolEvent || Boolean(selectedEvent));
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <View style={styles.overlay}>
+        <Pressable style={styles.dismiss} onPress={onClose} />
+        <View style={[styles.sheet, styles.keyboardSheet, { paddingBottom: 24 }]}>
+          <ScrollView keyboardDismissMode="on-drag" keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+            {eventModalOpen ? (
+              <StaffSchoolEventModal
+                visible
+                loading={eventLoading}
+                error={eventError}
+                events={events}
+                selectedEvent={selectedEvent}
+                extraNote={extraNote}
+                onExtraNote={setExtraNote}
+                eventMenuOpen={eventMenuOpen}
+                onBack={() => setEventModalOpen(false)}
+                onToggleEvents={() => setEventMenuOpen((open) => !open)}
+                onSelectEvent={(id: string) => {
+                  setEventId(id);
+                  setEventMenuOpen(false);
+                }}
+                onRetry={() => {
+                  setEventsLoaded(false);
+                  setEventError(null);
+                  setEventReloadKey((key) => key + 1);
+                }}
+                onConfirm={() => reason && selectedEvent && onSubmit({
+                  reason,
+                  schoolEventId: eventId ?? undefined,
+                  extraNote: extraNote.trim() || undefined,
+                })}
+              />
+            ) : textEntryModalOpen ? (
+              <>
+                <View style={styles.handle} />
+                <TouchableOpacity style={styles.backToCheckoutButton} onPress={() => setTextEntryModalOpen(false)}>
+                  <Ionicons name="arrow-back" size={20} color={COLORS.primary} />
+                  <Text style={styles.backToCheckoutText}>Back</Text>
+                </TouchableOpacity>
+                <Text style={styles.sheetTitle}>{STAFF_CHECKOUT_REASONS.find((item) => item.value === reason)?.label ?? "Checkout Details"}</Text>
+                <Text style={styles.sheetSub}>
+                  {textEntryType === "otherReason" ? "Tell us why you are leaving school." : "Add any additional checkout details (optional)."}
+                </Text>
+                <Text style={styles.classLabel}>{textEntryType === "otherReason" ? "Other Reason" : "Extra Notes"}</Text>
+                <TextInput
+                  style={styles.reasonTextArea}
+                  placeholder={textEntryType === "otherReason" ? "Enter the reason" : "Enter extra notes (optional)"}
+                  value={textEntryType === "otherReason" ? otherReason : extraNote}
+                  onChangeText={textEntryType === "otherReason" ? setOtherReason : setExtraNote}
+                  multiline
+                  textAlignVertical="top"
+                  numberOfLines={5}
+                />
+                <TouchableOpacity
+                  style={[styles.doneButton, (loading || (textEntryType === "otherReason" && !otherReason.trim())) && styles.disabled]}
+                  disabled={loading || (textEntryType === "otherReason" && !otherReason.trim())}
+                  onPress={() => reason && onSubmit({
+                    reason,
+                    otherReason: textEntryType === "otherReason" ? otherReason.trim() : undefined,
+                    extraNote: textEntryType === "extraNote" ? extraNote.trim() || undefined : undefined,
+                  })}
+                >
+                  {loading ? <ActivityIndicator color="#FFF" /> : <Text style={styles.doneButtonText}>Confirm Check-Out</Text>}
+                </TouchableOpacity>
+              </>
+            ) : (
+              <>
+            <View style={styles.handle} />
+            <Text style={styles.sheetTitle}>Staff Check-Out</Text>
+            <Text style={styles.sheetSub}>Choose why you are leaving school.</Text>
+            {STAFF_CHECKOUT_REASONS.map((item) => (
+              <Choice
+                key={item.value}
+                active={reason === item.value}
+                title={item.label}
+                onPress={() => {
+                  setReason(item.value);
+                  if (item.value === StaffGateAttendanceRequestGateReasonEnum.SchoolEvent) {
+                    setEventId(null);
+                    setTextEntryModalOpen(false);
+                    setEventModalOpen(true);
+                    setOtherReason("");
+                    setExtraNote("");
+                  } else {
+                    setEventModalOpen(false);
+                    setOtherReason("");
+                    setExtraNote("");
+                    const isOtherReason = item.value === StaffGateAttendanceRequestGateReasonEnum.Other;
+                    setTextEntryType("otherReason");
+                    setTextEntryModalOpen(
+                      item.value !== StaffGateAttendanceRequestGateReasonEnum.SchoolClosed,
+                    );
+                    if (!isOtherReason) setTextEntryType("extraNote");
+                  }
+                  setEventMenuOpen(false);
+                  setEventError(null);
+                }}
+              />
+            ))}
+            {reason === StaffGateAttendanceRequestGateReasonEnum.SchoolClosed && (
+              <TouchableOpacity
+                style={[styles.doneButton, (!canSubmit || loading) && styles.disabled]}
+                disabled={!canSubmit || loading}
+                onPress={() => reason && onSubmit({ reason })}
+              >
+                {loading ? <ActivityIndicator color="#FFF" /> : <Text style={styles.doneButtonText}>Confirm Check-Out</Text>}
+              </TouchableOpacity>
+            )}
+              </>
+            )}
+          </ScrollView>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+function StaffSchoolEventModal({
+  visible,
+  loading,
+  error,
+  events,
+  selectedEvent,
+  extraNote,
+  onExtraNote,
+  eventMenuOpen,
+  onBack,
+  onToggleEvents,
+  onSelectEvent,
+  onRetry,
+  onConfirm,
+}: any) {
+  if (!visible) return null;
+  return (
+      <>
+          <View style={styles.handle} />
+          <TouchableOpacity style={styles.backToCheckoutButton} onPress={onBack}>
+            <Ionicons name="arrow-back" size={20} color={COLORS.primary} />
+          <Text style={styles.backToCheckoutText}>Back</Text>
+          </TouchableOpacity>
+          <Text style={styles.sheetTitle}>School Event</Text>
+          <Text style={styles.sheetSub}>Select the event related to your checkout.</Text>
+          {loading ? (
+            <ActivityIndicator color={COLORS.primary} style={{ marginVertical: 24 }} />
+          ) : error ? (
+            <View style={styles.eventErrorState}>
+              <Text style={styles.eventErrorText}>{error}</Text>
+              <TouchableOpacity style={styles.eventRetryButton} onPress={onRetry}>
+                <Text style={styles.eventRetryText}>Try again</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <>
+              <Text style={styles.classLabel}>Event</Text>
+              <TouchableOpacity style={styles.classSelect} onPress={onToggleEvents}>
+                <Text style={selectedEvent ? styles.classSelectText : styles.placeholder}>
+                  {selectedEvent?.label ?? "Select an event"}
+                </Text>
+                <Ionicons name={eventMenuOpen ? "chevron-up" : "chevron-down"} size={20} color="#64748B" />
+              </TouchableOpacity>
+              {eventMenuOpen && (
+                <View style={styles.classMenu}>
+                  {events.map((event: { id: string; label: string }) => (
+                    <TouchableOpacity key={event.id} style={styles.classMenuItem} onPress={() => onSelectEvent(event.id)}>
+                      <Text style={styles.classMenuText}>{event.label}</Text>
+                    </TouchableOpacity>
+                  ))}
+                  {events.length === 0 && (
+                    <Text style={styles.eventErrorText}>No events available for this term.</Text>
+                  )}
+                </View>
+              )}
+              <Text style={[styles.classLabel, { marginTop: 16 }]}>Extra Notes</Text>
+              <TextInput
+                style={styles.reasonTextArea}
+                placeholder="Add extra notes (optional)"
+                value={extraNote}
+                onChangeText={onExtraNote}
+                multiline
+                textAlignVertical="top"
+                numberOfLines={4}
+              />
+              <TouchableOpacity
+                style={[styles.doneButton, !selectedEvent && styles.disabled]}
+                disabled={!selectedEvent}
+                onPress={onConfirm}
+              >
+                <Text style={styles.doneButtonText}>Confirm Check-Out</Text>
+              </TouchableOpacity>
+            </>
+          )}
+      </>
+  );
+}
+
+function PersonCard({
+  person,
+  showIdentifier = true,
+  alignTextTop = false,
+}: {
+  person: Person;
+  showIdentifier?: boolean;
+  alignTextTop?: boolean;
+}) {
   const displayName = formatPersonName(person.name);
   return (
     <View style={styles.card}>
       <View style={styles.avatar}>
         <Text style={styles.avatarText}>{displayName.charAt(0)}</Text>
       </View>
-      <View style={styles.cardText}>
+      <View style={[styles.cardText, alignTextTop && styles.cardTextTop]}>
         <Text style={styles.userName}>{displayName}</Text>
-        <Text style={styles.userId}>
-          {person.admissionNumber || "Admission number unavailable"}
-        </Text>
+        {showIdentifier && person.admissionNumber ? (
+          <Text style={styles.userId}>{person.admissionNumber}</Text>
+        ) : null}
       </View>
       {typeof person.isInSchool === "boolean" && (
         <View
@@ -1624,18 +2339,36 @@ function CheckoutModal({
   onSubmit,
 }: any) {
   const [eventDialogOpen, setEventDialogOpen] = useState(false);
+  const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
+  const [detailsConfirmed, setDetailsConfirmed] = useState(false);
+  const [eventDetailsConfirmed, setEventDetailsConfirmed] = useState(false);
   const [keyboardVisible, setKeyboardVisible] = useState(false);
   const [eventLoading, setEventLoading] = useState(false);
   const [eventOptionsLoaded, setEventOptionsLoaded] = useState(false);
   const [eventError, setEventError] = useState<string | null>(null);
+  const [staffOptionsLoaded, setStaffOptionsLoaded] = useState(false);
+  const [staffError, setStaffError] = useState<string | null>(null);
   const [events, setEvents] = useState<{ id: string; label: string }[]>([]);
   const [supervisors, setSupervisors] = useState<
     { id: string; label: string }[]
   >([]);
+  const [approvers, setApprovers] = useState<{ id: string; label: string }[]>(
+    [],
+  );
   const [eventId, setEventId] = useState<string | null>(null);
   const [supervisorId, setSupervisorId] = useState<string | null>(null);
+  const [eventApprovedById, setEventApprovedById] = useState<string | null>(
+    null,
+  );
+  const [approvedById, setApprovedById] = useState<string | null>(null);
+  const [destination, setDestination] = useState("");
+  const [note, setNote] = useState("");
+  const [eventExtraNotes, setEventExtraNotes] = useState("");
+  const [detailsOtherReason, setDetailsOtherReason] = useState("");
   const [eventMenuOpen, setEventMenuOpen] = useState(false);
   const [supervisorMenuOpen, setSupervisorMenuOpen] = useState(false);
+  const [eventApprovedByMenuOpen, setEventApprovedByMenuOpen] = useState(false);
+  const [approvedByMenuOpen, setApprovedByMenuOpen] = useState(false);
   const eventOptionsRequestStarted = useRef(false);
   useEffect(() => {
     const showEvent =
@@ -1668,11 +2401,17 @@ function CheckoutModal({
     eventOptionsRequestStarted.current = true;
     setEventLoading(true);
     setEventError(null);
+    setStaffError(null);
+    let staffLoadedSuccessfully = false;
     try {
-      const [sessionResponse, staffResponse] = await Promise.all([
-        academicSessionsApi.getCurrentAcademicSession(),
-        staffsApi.getStaffs({ pageSize: 100 }),
-      ]);
+      const [sessionResponse, staffResponse, ...approverResponses] =
+        await Promise.all([
+          academicSessionsApi.getCurrentAcademicSession(),
+          staffsApi.getStaffs({ pageSize: 100 }),
+          ...APPROVER_STAFF_ROLES.map((role) =>
+            staffsApi.getStaffs({ role, pageNumber: 1, pageSize: 100 }),
+          ),
+        ]);
       if (
         sessionResponse.data.success === false ||
         staffResponse.data.success === false
@@ -1683,6 +2422,45 @@ function CheckoutModal({
             "Could not load the current term and staff list.",
         );
       }
+      const failedApproverResponse = approverResponses.find(
+        (response) => response.data.success === false,
+      );
+      if (failedApproverResponse) {
+        throw new Error(
+          failedApproverResponse.data.message ||
+            "Could not load staff with administrative roles.",
+        );
+      }
+      const approverStaffById = new Map<
+        string,
+        { id: string; label: string }
+      >();
+      approverResponses.forEach((response) => {
+        (response.data.items ?? []).forEach((staff: any) => {
+          if (!staff.id) return;
+          approverStaffById.set(staff.id, {
+            id: staff.id,
+            label:
+              [staff.firstName, staff.lastName].filter(Boolean).join(" ") ||
+              staff.staffNo ||
+              "Staff member",
+          });
+        });
+      });
+      setApprovers(Array.from(approverStaffById.values()));
+      setSupervisors(
+        (staffResponse.data.items ?? [])
+          .map((staff: any) => ({
+            id: staff.id ?? "",
+            label:
+              [staff.firstName, staff.lastName].filter(Boolean).join(" ") ||
+              staff.staffNo ||
+              "Staff member",
+          }))
+          .filter((staff) => staff.id),
+      );
+      setStaffOptionsLoaded(true);
+      staffLoadedSuccessfully = true;
       const currentTermId = sessionResponse.data.data?.terms?.find(
         (term) => term.isCurrent,
       )?.id;
@@ -1712,17 +2490,6 @@ function CheckoutModal({
           }))
           .filter((event) => event.id),
       );
-      setSupervisors(
-        (staffResponse.data.items ?? [])
-          .map((staff: any) => ({
-            id: staff.id ?? "",
-            label:
-              [staff.firstName, staff.lastName].filter(Boolean).join(" ") ||
-              staff.staffNo ||
-              "Staff member",
-          }))
-          .filter((staff) => staff.id),
-      );
       setEventOptionsLoaded(true);
     } catch (error) {
       const message = getRequestErrorMessage(
@@ -1730,6 +2497,8 @@ function CheckoutModal({
         "Could not load school events and staff.",
       );
       setEventError(message);
+      if (!staffLoadedSuccessfully && !staffOptionsLoaded)
+        setStaffError(message);
     } finally {
       eventOptionsRequestStarted.current = false;
       setEventLoading(false);
@@ -1742,10 +2511,14 @@ function CheckoutModal({
   }, [termId, canLoadSchoolEventOptions]);
   const openSchoolEvent = () => {
     Keyboard.dismiss();
+    setEventDetailsConfirmed(false);
     if (reason !== RecordGateAttendanceRequestGateReasonEnum.SchoolEvent) {
       setEventId(null);
       setSupervisorId(null);
+      setEventApprovedById(null);
+      setEventDetailsConfirmed(false);
     }
+    setDetailsDialogOpen(false);
     onReason(RecordGateAttendanceRequestGateReasonEnum.SchoolEvent);
     setEventDialogOpen(true);
     if (!eventOptionsLoaded && !eventLoading) void loadSchoolEventOptions();
@@ -1760,10 +2533,16 @@ function CheckoutModal({
   const selectedSupervisor = supervisors.find(
     (supervisor) => supervisor.id === supervisorId,
   );
-  const canSubmitCheckout =
-    canSubmit &&
-    (reason !== RecordGateAttendanceRequestGateReasonEnum.SchoolEvent ||
-      (Boolean(selectedEvent) && Boolean(selectedSupervisor)));
+  const selectedAdminEventApprover = approvers.find(
+    (staff) => staff.id === eventApprovedById,
+  );
+  const selectedApprover = approvers.find((staff) => staff.id === approvedById);
+  const isSchoolEvent =
+    reason === RecordGateAttendanceRequestGateReasonEnum.SchoolEvent;
+  const isSchoolClosed =
+    reason === RecordGateAttendanceRequestGateReasonEnum.SchoolClosed;
+  const needsDetails = Boolean(reason) && !isSchoolEvent && !isSchoolClosed;
+  const canSubmitCheckout = canSubmit && isSchoolClosed;
   return (
     <>
       <Modal
@@ -1784,9 +2563,80 @@ function CheckoutModal({
             style={[
               styles.sheet,
               styles.keyboardSheet,
-              { paddingBottom: Math.max(insetBottom, 24) },
+              {
+                paddingBottom: Math.max(insetBottom, 24),
+              },
             ]}
           >
+            {eventDialogOpen ? (
+              <SchoolEventModal
+                visible
+                loading={eventLoading}
+                error={eventError}
+                events={events}
+                supervisors={supervisors}
+                approvers={approvers}
+                eventId={eventId}
+                supervisorId={supervisorId}
+                approvedById={eventApprovedById}
+                extraNotes={eventExtraNotes}
+                eventMenuOpen={eventMenuOpen}
+                supervisorMenuOpen={supervisorMenuOpen}
+                approvedByMenuOpen={eventApprovedByMenuOpen}
+                onClose={() => setEventDialogOpen(false)}
+                onBack={() => setEventDialogOpen(false)}
+                onRetry={retrySchoolEventOptions}
+                onEventMenu={() => setEventMenuOpen(!eventMenuOpen)}
+                onSupervisorMenu={() => setSupervisorMenuOpen(!supervisorMenuOpen)}
+                onApprovedByMenu={() => setEventApprovedByMenuOpen(!eventApprovedByMenuOpen)}
+                onEvent={(id: string) => { setEventId(id); setEventMenuOpen(false); }}
+                onSupervisor={(id: string) => { setSupervisorId(id); setSupervisorMenuOpen(false); }}
+                onApprovedBy={(id: string) => { setEventApprovedById(id); setEventApprovedByMenuOpen(false); }}
+                onExtraNotes={setEventExtraNotes}
+                onConfirm={() => {
+                  if (selectedEvent && selectedSupervisor && selectedAdminEventApprover) {
+                    onSubmit({
+                      schoolEventId: eventId ?? undefined,
+                      approvedByStaffId: eventApprovedById ?? undefined,
+                      accompaniedByStaffId: supervisorId ?? undefined,
+                      extraNotes: eventExtraNotes.trim() || undefined,
+                    });
+                  }
+                }}
+              />
+            ) : detailsDialogOpen ? (
+              <CheckoutDetailsModal
+                visible
+                reason={reason}
+                loading={eventLoading && !staffOptionsLoaded}
+                error={staffError}
+                staff={approvers}
+                approvedById={approvedById}
+                approvedByMenuOpen={approvedByMenuOpen}
+                destination={destination}
+                note={note}
+                otherReason={detailsOtherReason}
+                onDestination={setDestination}
+                onNote={setNote}
+                onOtherReason={(value: string) => { setDetailsOtherReason(value); onOther(value); }}
+                onApprovedByMenu={() => setApprovedByMenuOpen(!approvedByMenuOpen)}
+                onApprovedBy={(id: string) => { setApprovedById(id); setApprovedByMenuOpen(false); }}
+                onClose={() => { if (keyboardVisible) Keyboard.dismiss(); else setDetailsDialogOpen(false); }}
+                onBack={() => setDetailsDialogOpen(false)}
+                onRetry={retrySchoolEventOptions}
+                onConfirm={() => {
+                  const approver = approvers.find((staff) => staff.id === approvedById);
+                  if (destination.trim() && approver && (reason !== RecordGateAttendanceRequestGateReasonEnum.Other || detailsOtherReason.trim())) {
+                    onSubmit({
+                      approvedByStaffId: approvedById ?? undefined,
+                      destination: destination.trim() || undefined,
+                      extraNotes: note.trim() || undefined,
+                      otherReason: detailsOtherReason.trim() || undefined,
+                    });
+                  }
+                }}
+              />
+            ) : (
             <ScrollView
               style={styles.checkoutScroll}
               contentContainerStyle={styles.checkoutScrollContent}
@@ -1824,13 +2674,7 @@ function CheckoutModal({
                 Why is {student?.name?.split(" ")[0] ?? "this student"} leaving?
               </Text>
               <View style={{ marginBottom: 4 }}>
-                {REASONS.filter(
-                  (item) =>
-                    reason !==
-                      RecordGateAttendanceRequestGateReasonEnum.Other ||
-                    item.value ===
-                      RecordGateAttendanceRequestGateReasonEnum.Other,
-                ).map((item) => (
+                {REASONS.map((item) => (
                   <Choice
                     key={item.value}
                     active={reason === item.value}
@@ -1843,34 +2687,27 @@ function CheckoutModal({
                         openSchoolEvent();
                         return;
                       }
+                      Keyboard.dismiss();
                       setEventId(null);
                       setSupervisorId(null);
+                      setEventApprovedById(null);
+                      setApprovedById(null);
+                      setEventDetailsConfirmed(false);
+                      setDetailsConfirmed(false);
                       onReason(item.value);
+                      if (
+                        item.value ===
+                        RecordGateAttendanceRequestGateReasonEnum.SchoolClosed
+                      ) {
+                        setDetailsDialogOpen(false);
+                      } else {
+                        setDetailsDialogOpen(true);
+                      }
                     }}
                   />
                 ))}
               </View>
-              {reason ===
-                RecordGateAttendanceRequestGateReasonEnum.SchoolEvent &&
-                (selectedEvent || selectedSupervisor) && (
-                  <Text style={styles.eventSelectionSummary}>
-                    {[selectedEvent?.label, selectedSupervisor?.label]
-                      .filter(Boolean)
-                      .join(" · ")}
-                  </Text>
-                )}
-              {reason === RecordGateAttendanceRequestGateReasonEnum.Other && (
-                <TextInput
-                  style={styles.reasonTextArea}
-                  placeholder="Enter reason"
-                  value={otherReason}
-                  onChangeText={onOther}
-                  multiline
-                  textAlignVertical="top"
-                  numberOfLines={4}
-                />
-              )}
-              <TouchableOpacity
+              {isSchoolClosed && <TouchableOpacity
                 style={[
                   styles.doneButton,
                   !canSubmitCheckout && styles.disabled,
@@ -1879,7 +2716,20 @@ function CheckoutModal({
                 onPress={() =>
                   onSubmit({
                     schoolEventId: eventId ?? undefined,
-                    approvedByStaffId: supervisorId ?? undefined,
+                    approvedByStaffId:
+                      (isSchoolEvent ? eventApprovedById : approvedById) ??
+                      undefined,
+                    accompaniedByStaffId: isSchoolEvent
+                      ? (supervisorId ?? undefined)
+                      : undefined,
+                    destination: destination.trim() || undefined,
+                    extraNotes:
+                      (isSchoolEvent ? eventExtraNotes : note).trim() ||
+                      undefined,
+                    otherReason:
+                      detailsOtherReason.trim() ||
+                      otherReason.trim() ||
+                      undefined,
                   })
                 }
               >
@@ -1890,39 +2740,11 @@ function CheckoutModal({
                     Confirm Leave School
                   </Text>
                 )}
-              </TouchableOpacity>
+              </TouchableOpacity>}
             </ScrollView>
+            )}
           </View>
         </View>
-        <SchoolEventModal
-          visible={eventDialogOpen}
-          loading={eventLoading}
-          error={eventError}
-          events={events}
-          supervisors={supervisors}
-          eventId={eventId}
-          supervisorId={supervisorId}
-          eventMenuOpen={eventMenuOpen}
-          supervisorMenuOpen={supervisorMenuOpen}
-          onClose={() => setEventDialogOpen(false)}
-          onRetry={retrySchoolEventOptions}
-          onEventMenu={() => setEventMenuOpen(!eventMenuOpen)}
-          onSupervisorMenu={() => setSupervisorMenuOpen(!supervisorMenuOpen)}
-          onEvent={(id: string) => {
-            setEventId(id);
-            setEventMenuOpen(false);
-          }}
-          onSupervisor={(id: string) => {
-            setSupervisorId(id);
-            setSupervisorMenuOpen(false);
-          }}
-          onConfirm={() => {
-            if (selectedEvent && selectedSupervisor) {
-              onReason(RecordGateAttendanceRequestGateReasonEnum.SchoolEvent);
-              setEventDialogOpen(false);
-            }
-          }}
-        />
       </Modal>
     </>
   );
@@ -1933,105 +2755,322 @@ function SchoolEventModal({
   error,
   events,
   supervisors,
+  approvers,
   eventId,
   supervisorId,
+  approvedById,
+  extraNotes,
   eventMenuOpen,
   supervisorMenuOpen,
+  approvedByMenuOpen,
   onClose,
+  onBack,
   onRetry,
   onEventMenu,
   onSupervisorMenu,
+  onApprovedByMenu,
   onEvent,
   onSupervisor,
+  onApprovedBy,
+  onExtraNotes,
   onConfirm,
 }: any) {
   const event = events.find((item: any) => item.id === eventId);
   const supervisor = supervisors.find((item: any) => item.id === supervisorId);
+  const approver = approvers.find((item: any) => item.id === approvedById);
   if (!visible) return null;
   return (
-    <View style={[styles.overlay, styles.eventModalOverlay]}>
-      <Pressable style={styles.dismiss} onPress={onClose} />
-      <View style={[styles.sheet, styles.keyboardSheet]}>
-        <View style={styles.handle} />
-        <Text style={styles.sheetTitle}>School Event Details</Text>
-        <Text style={styles.sheetSub}>
-          Select the event and staff member supervising the student.
-        </Text>
-        {loading ? (
-          <ActivityIndicator
-            color={COLORS.primary}
-            style={{ marginVertical: 28 }}
-          />
-        ) : error ? (
-          <View style={styles.eventErrorState}>
-            <Text style={styles.eventErrorText}>{error}</Text>
-            <TouchableOpacity style={styles.eventRetryButton} onPress={onRetry}>
-              <Text style={styles.eventRetryText}>Try again</Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <>
-            <Text style={styles.classLabel}>Event</Text>
-            <TouchableOpacity style={styles.classSelect} onPress={onEventMenu}>
-              <Text style={event ? styles.classSelectText : styles.placeholder}>
-                {event?.label ?? "Select an event"}
-              </Text>
-              <Ionicons name="chevron-down" size={20} color="#64748B" />
-            </TouchableOpacity>
-            {eventMenuOpen && (
-              <View style={styles.classMenu}>
-                {events.map((item: any) => (
-                  <TouchableOpacity
-                    key={item.id}
-                    style={styles.classMenuItem}
-                    onPress={() => onEvent(item.id)}
-                  >
-                    <Text style={styles.classMenuText}>{item.label}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            )}
-            <Text style={[styles.classLabel, { marginTop: 18 }]}>
-              Supervisor
-            </Text>
-            <TouchableOpacity
-              style={styles.classSelect}
-              onPress={onSupervisorMenu}
-            >
-              <Text
-                style={supervisor ? styles.classSelectText : styles.placeholder}
+        <ScrollView
+          style={styles.checkoutScroll}
+          keyboardDismissMode="on-drag"
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.checkoutScrollContent}
+        >
+          <View style={styles.handle} />
+          <TouchableOpacity style={styles.backToCheckoutButton} onPress={onBack}>
+            <Ionicons name="arrow-back" size={20} color={COLORS.primary} />
+              <Text style={styles.backToCheckoutText}>Back</Text>
+          </TouchableOpacity>
+          <Text style={styles.sheetTitle}>School Event</Text>
+          <Text style={styles.sheetSub}>
+            Select the event, approver, and supervising staff member.
+          </Text>
+          {loading ? (
+            <ActivityIndicator
+              color={COLORS.primary}
+              style={{ marginVertical: 28 }}
+            />
+          ) : error ? (
+            <View style={styles.eventErrorState}>
+              <Text style={styles.eventErrorText}>{error}</Text>
+              <TouchableOpacity
+                style={styles.eventRetryButton}
+                onPress={onRetry}
               >
-                {supervisor?.label ?? "Select supervising staff"}
+                <Text style={styles.eventRetryText}>Try again</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <>
+              <Text style={styles.classLabel}>Event</Text>
+              <TouchableOpacity
+                style={styles.classSelect}
+                onPress={onEventMenu}
+              >
+                <Text
+                  style={event ? styles.classSelectText : styles.placeholder}
+                >
+                  {event?.label ?? "Select an event"}
+                </Text>
+                <Ionicons name="chevron-down" size={20} color="#64748B" />
+              </TouchableOpacity>
+              {eventMenuOpen && (
+                <View style={styles.classMenu}>
+                  {events.map((item: any) => (
+                    <TouchableOpacity
+                      key={item.id}
+                      style={styles.classMenuItem}
+                      onPress={() => onEvent(item.id)}
+                    >
+                      <Text style={styles.classMenuText}>{item.label}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+              <Text style={[styles.classLabel, { marginTop: 18 }]}>
+                Approved By
               </Text>
-              <Ionicons name="chevron-down" size={20} color="#64748B" />
-            </TouchableOpacity>
-            {supervisorMenuOpen && (
-              <View style={styles.classMenu}>
-                {supervisors.map((item: any) => (
-                  <TouchableOpacity
-                    key={item.id}
-                    style={styles.classMenuItem}
-                    onPress={() => onSupervisor(item.id)}
-                  >
-                    <Text style={styles.classMenuText}>{item.label}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            )}
-            <TouchableOpacity
-              style={[
-                styles.doneButton,
-                (!event || !supervisor) && styles.disabled,
-              ]}
-              disabled={!event || !supervisor}
-              onPress={onConfirm}
-            >
-              <Text style={styles.doneButtonText}>Use Event Details</Text>
-            </TouchableOpacity>
-          </>
-        )}
-      </View>
-    </View>
+              <TouchableOpacity
+                style={styles.classSelect}
+                onPress={onApprovedByMenu}
+              >
+                <Text
+                  style={approver ? styles.classSelectText : styles.placeholder}
+                >
+                  {approver?.label ?? "Select approving staff"}
+                </Text>
+                <Ionicons name="chevron-down" size={20} color="#64748B" />
+              </TouchableOpacity>
+              {approvedByMenuOpen && (
+                <View style={styles.classMenu}>
+                  {approvers.map((item: any) => (
+                    <TouchableOpacity
+                      key={item.id}
+                      style={styles.classMenuItem}
+                      onPress={() => onApprovedBy(item.id)}
+                    >
+                      <Text style={styles.classMenuText}>{item.label}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+              <Text style={[styles.classLabel, { marginTop: 18 }]}>
+                Supervisor
+              </Text>
+              <TouchableOpacity
+                style={styles.classSelect}
+                onPress={onSupervisorMenu}
+              >
+                <Text
+                  style={
+                    supervisor ? styles.classSelectText : styles.placeholder
+                  }
+                >
+                  {supervisor?.label ?? "Select supervising staff"}
+                </Text>
+                <Ionicons name="chevron-down" size={20} color="#64748B" />
+              </TouchableOpacity>
+              {supervisorMenuOpen && (
+                <View style={styles.classMenu}>
+                  {supervisors.map((item: any) => (
+                    <TouchableOpacity
+                      key={item.id}
+                      style={styles.classMenuItem}
+                      onPress={() => onSupervisor(item.id)}
+                    >
+                      <Text style={styles.classMenuText}>{item.label}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+              <Text style={[styles.classLabel, { marginTop: 16 }]}>
+                Extra Notes
+              </Text>
+              <TextInput
+                style={styles.reasonTextArea}
+                placeholder="Add a note (optional)"
+                value={extraNotes}
+                onChangeText={onExtraNotes}
+                multiline
+                textAlignVertical="top"
+                numberOfLines={4}
+              />
+              <TouchableOpacity
+                style={[
+                  styles.doneButton,
+                  (!event || !approver || !supervisor) && styles.disabled,
+                ]}
+                disabled={!event || !approver || !supervisor}
+                onPress={onConfirm}
+              >
+                <Text style={styles.doneButtonText}>Confirm Check-Out</Text>
+              </TouchableOpacity>
+            </>
+          )}
+        </ScrollView>
+  );
+}
+
+function CheckoutDetailsModal({
+  visible,
+  reason,
+  loading,
+  error,
+  staff,
+  approvedById,
+  approvedByMenuOpen,
+  destination,
+  note,
+  otherReason,
+  onDestination,
+  onNote,
+  onOtherReason,
+  onApprovedByMenu,
+  onApprovedBy,
+  onClose,
+  onBack,
+  onRetry,
+  onConfirm,
+}: any) {
+  const approver = staff.find((item: any) => item.id === approvedById);
+  const isOther = reason === RecordGateAttendanceRequestGateReasonEnum.Other;
+  if (!visible) return null;
+  return (
+        <ScrollView
+          style={styles.checkoutScroll}
+          keyboardDismissMode="on-drag"
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.checkoutScrollContent}
+        >
+          <View style={styles.handle} />
+          <TouchableOpacity style={styles.backToCheckoutButton} onPress={onBack}>
+            <Ionicons name="arrow-back" size={20} color={COLORS.primary} />
+            <Text style={styles.backToCheckoutText}>Back</Text>
+          </TouchableOpacity>
+          <Text style={styles.sheetTitle}>
+            {REASONS.find((item: any) => item.value === reason)?.label ?? "Checkout Details"}
+          </Text>
+          <Text style={styles.sheetSub}>
+            Add the destination, approver, and any useful notes.
+          </Text>
+          {loading ? (
+            <ActivityIndicator
+              color={COLORS.primary}
+              style={{ marginVertical: 18 }}
+            />
+          ) : error ? (
+            <View style={styles.eventErrorState}>
+              <Text style={styles.eventErrorText}>{error}</Text>
+              <TouchableOpacity
+                style={styles.eventRetryButton}
+                onPress={onRetry}
+              >
+                <Text style={styles.eventRetryText}>Try again</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <>
+              <Text style={[styles.classLabel, { marginTop: 16 }]}>
+                Destination
+              </Text>
+              <TextInput
+                style={styles.input}
+                placeholder="Where is the student going?"
+                value={destination}
+                onChangeText={onDestination}
+                returnKeyType="done"
+              />
+              <Text style={[styles.classLabel, { marginTop: 16 }]}>
+                Approved By
+              </Text>
+              <TouchableOpacity
+                style={styles.classSelect}
+                onPress={onApprovedByMenu}
+              >
+                <Text
+                  style={approver ? styles.classSelectText : styles.placeholder}
+                >
+                  {approver?.label ?? "Select approving staff"}
+                </Text>
+                <Ionicons name="chevron-down" size={20} color="#64748B" />
+              </TouchableOpacity>
+              {approvedByMenuOpen && (
+                <View style={styles.classMenu}>
+                  {staff.map((item: any) => (
+                    <TouchableOpacity
+                      key={item.id}
+                      style={styles.classMenuItem}
+                      onPress={() => onApprovedBy(item.id)}
+                    >
+                      <Text style={styles.classMenuText}>{item.label}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+              {isOther && (
+                <>
+                  <Text style={[styles.classLabel, { marginTop: 16 }]}>
+                    Other Reason
+                  </Text>
+                  <TextInput
+                    style={styles.reasonTextArea}
+                    placeholder="Enter reason"
+                    value={otherReason}
+                    onChangeText={onOtherReason}
+                    multiline
+                    textAlignVertical="top"
+                    numberOfLines={4}
+                  />
+                </>
+              )}
+              {!isOther && (
+                <>
+                  <Text style={[styles.classLabel, { marginTop: 16 }]}>
+                    Extra Notes
+                  </Text>
+                  <TextInput
+                    style={styles.reasonTextArea}
+                    placeholder="Add a note (optional)"
+                    value={note}
+                    onChangeText={onNote}
+                    multiline
+                    textAlignVertical="top"
+                    numberOfLines={4}
+                  />
+                </>
+              )}
+              <TouchableOpacity
+                style={[
+                  styles.doneButton,
+                  (!destination.trim() ||
+                    !approver ||
+                    (isOther && !otherReason.trim())) &&
+                    styles.disabled,
+                ]}
+                disabled={
+                  !destination.trim() ||
+                  !approver ||
+                  (isOther && !otherReason.trim())
+                }
+                onPress={onConfirm}
+              >
+                <Text style={styles.doneButtonText}>Confirm Check-Out</Text>
+              </TouchableOpacity>
+            </>
+          )}
+        </ScrollView>
   );
 }
 function Choice({ active, title, description, onPress }: any) {
@@ -2052,11 +3091,7 @@ function Choice({ active, title, description, onPress }: any) {
     </TouchableOpacity>
   );
 }
-function SuccessModal({
-  success,
-  copy,
-  onDone,
-}: any) {
+function SuccessModal({ success, copy, onDone }: any) {
   return (
     <Modal visible={Boolean(success)} transparent animationType="fade">
       <View style={styles.successOverlay}>
@@ -2260,6 +3295,7 @@ const styles = StyleSheet.create({
     fontFamily: "Lexend",
   },
   cardText: { flex: 1 },
+  cardTextTop: { alignSelf: "flex-start" },
   userName: {
     fontSize: 16,
     fontWeight: "700",
@@ -2528,6 +3564,7 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     left: 0,
+    backgroundColor: "transparent",
     zIndex: 10,
     elevation: 10,
   },
@@ -2538,6 +3575,13 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
+    overflow: "hidden",
+  },
+  checkoutDetailSheet: {
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    overflow: "hidden",
+    backgroundColor: "#FFF",
   },
   keyboardSheet: {
     width: "100%",
@@ -2556,6 +3600,20 @@ const styles = StyleSheet.create({
     backgroundColor: "#D1D5DB",
     alignSelf: "center",
     marginBottom: 20,
+  },
+  backToCheckoutButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
+    gap: 8,
+    marginBottom: 14,
+    paddingVertical: 4,
+  },
+  backToCheckoutText: {
+    color: COLORS.primary,
+    fontSize: 14,
+    fontWeight: "600",
+    fontFamily: "Lexend",
   },
   sheetTitle: {
     fontSize: 21,
@@ -2616,7 +3674,6 @@ const styles = StyleSheet.create({
   reasonBox: { marginBottom: 4 },
   placeholder: { color: "#9CA3AF", fontFamily: "Lexend" },
   input: {
-    marginTop: 12,
     minHeight: 50,
     borderRadius: 12,
     borderWidth: 1,
@@ -2626,7 +3683,6 @@ const styles = StyleSheet.create({
     fontFamily: "Lexend",
   },
   reasonTextArea: {
-    marginTop: 12,
     minHeight: 120,
     maxHeight: 180,
     borderRadius: 12,
