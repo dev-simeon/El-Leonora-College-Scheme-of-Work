@@ -121,7 +121,8 @@ export default function StudentDashboard() {
     isError: isAttendanceError,
     refetch: refetchStudentAttendance,
   } = useQuery({
-    queryKey: ["dashboard-student-attendance", user?.id, classId, getLocalDate()],
+    // Version the key so persisted summaries from the prior calculation are not reused.
+    queryKey: ["dashboard-student-attendance-v2", user?.id, classId, getLocalDate()],
     queryFn: async () => {
       if (!classId) return null;
       const [attendanceResponse, rosterResponse] = await Promise.all([
@@ -164,6 +165,8 @@ export default function StudentDashboard() {
       };
     },
     enabled: !!user && user.role === "student" && !!classId,
+    staleTime: 60_000,
+    refetchOnMount: "always",
     retry: false,
   });
 

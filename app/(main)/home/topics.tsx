@@ -167,6 +167,15 @@ export default function TopicsScreen() {
     refetch();
   };
 
+  const handleBack = () => {
+    if (router.canGoBack()) {
+      router.back();
+      return;
+    }
+
+    router.replace("/(main)/home/subjects");
+  };
+
   const handleTermSelect = (term: string) => {
     const termIdMap: Record<string, string> = {
       "1st Term": "1",
@@ -196,7 +205,7 @@ export default function TopicsScreen() {
       <View style={styles.container}>
         {isFocused && <StatusBar style="dark" />}
         <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
-          <Pressable onPress={() => router.back()} style={styles.backButton}>
+          <Pressable onPress={handleBack} style={styles.backButton}>
             <Ionicons name="arrow-back" size={24} color="#0F172A" />
           </Pressable>
           <Text style={styles.headerTitle}>{subjectName || "Loading..."}</Text>
@@ -276,7 +285,7 @@ export default function TopicsScreen() {
 
       {/* Header with Top Inset */}
       <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
-        <Pressable onPress={() => router.back()} style={styles.backButton}>
+        <Pressable onPress={handleBack} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color="#0F172A" />
         </Pressable>
         <View style={styles.titleContainer}>

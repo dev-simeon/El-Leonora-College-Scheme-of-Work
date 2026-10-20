@@ -61,11 +61,96 @@ const isTablePayload = (payload: LessonTablePayload) =>
   String(payload.type ?? payload.originalType ?? "").toLowerCase() === "table";
 
 const isOrderedList = (payload: Record<string, any>) => {
-  const style = String(payload.listStyle ?? payload.type ?? "").toLowerCase();
-  return (
-    payload.ordered === true ||
-    ["ordered", "numbered", "orderedlist"].includes(style)
+  return payload.ordered === true;
+};
+
+type OrderedListStyle =
+  | "decimal"
+  | "lower_alpha"
+  | "upper_alpha"
+  | "lower_roman"
+  | "upper_roman";
+
+const getOrderedListStyle = (payload: Record<string, any>): OrderedListStyle => {
+  switch (payload.listStyle) {
+    case "lower_alpha":
+    case "a":
+      return "lower_alpha";
+    case "upper_alpha":
+    case "A":
+      return "upper_alpha";
+    case "lower_roman":
+    case "i":
+      return "lower_roman";
+    case "upper_roman":
+    case "I":
+      return "upper_roman";
+    default:
+      return "decimal";
+  }
+};
+
+const getListMarkerSuffix = (payload: Record<string, any>) => {
+  const suffix = payload.listMarkerSuffix;
+  const suffixes = Array.isArray(suffix) ? suffix : [suffix];
+  const validSuffixes = suffixes.filter(
+    (value): value is "." | ")" => value === "." || value === ")",
   );
+  return validSuffixes.length ? validSuffixes.join("") : ".";
+};
+
+const toLowerAlpha = (value: number) => {
+  let number = value;
+  let result = "";
+  while (number > 0) {
+    number -= 1;
+    result = String.fromCharCode(97 + (number % 26)) + result;
+    number = Math.floor(number / 26);
+  }
+  return result;
+};
+
+const toRoman = (value: number) => {
+  if (value > 3999) return String(value);
+  const numerals: [number, string][] = [
+    [1000, "M"], [900, "CM"], [500, "D"], [400, "CD"],
+    [100, "C"], [90, "XC"], [50, "L"], [40, "XL"],
+    [10, "X"], [9, "IX"], [5, "V"], [4, "IV"], [1, "I"],
+  ];
+  let remaining = value;
+  let result = "";
+  for (const [amount, numeral] of numerals) {
+    while (remaining >= amount) {
+      result += numeral;
+      remaining -= amount;
+    }
+  }
+  return result;
+};
+
+const getOrderedMarker = (index: number, payload: Record<string, any>) => {
+  const value = index + 1;
+  const style = getOrderedListStyle(payload);
+  let marker: string;
+
+  switch (style) {
+    case "lower_alpha":
+      marker = toLowerAlpha(value);
+      break;
+    case "upper_alpha":
+      marker = toLowerAlpha(value).toUpperCase();
+      break;
+    case "lower_roman":
+      marker = toRoman(value).toLowerCase();
+      break;
+    case "upper_roman":
+      marker = toRoman(value);
+      break;
+    default:
+      marker = String(value);
+  }
+
+  return `${marker}${getListMarkerSuffix(payload)}`;
 };
 
 const listItemText = (item: unknown) => cellText(item);
@@ -130,9 +215,11 @@ export default function TopicContentScreen() {
   const insets = useSafeAreaInsets();
   const { width: screenWidth } = useWindowDimensions();
   const router = useRouter();
-  const { topicId, topicTitle } = useLocalSearchParams<{
+  const { topicId, topicTitle, subjectId, classId } = useLocalSearchParams<{
     topicId: string;
     topicTitle: string;
+    subjectId?: string;
+    classId?: string;
   }>();
 
   const { showToast } = useToast();
@@ -179,6 +266,23 @@ export default function TopicContentScreen() {
 
   const onRefresh = () => {
     refetch();
+  };
+
+  const handleBack = () => {
+    if (router.canGoBack()) {
+      router.back();
+      return;
+    }
+
+    if (subjectId) {
+      router.replace({
+        pathname: "/(main)/home/topics",
+        params: { id: subjectId, classId },
+      });
+      return;
+    }
+
+    router.replace("/(main)/home/subjects");
   };
 
   const renderBlock = (
@@ -249,7 +353,9 @@ export default function TopicContentScreen() {
         <View key={block.id || index} style={styles.listItem}>
           <View style={styles.listDotContainer}>
             {ordered ? (
-              <Text style={styles.listOrderNumber}>{index + 1}.</Text>
+              <Text style={styles.listOrderNumber}>
+                {getOrderedMarker(index, payload)}
+              </Text>
             ) : (
               <Ionicons
                 name="ellipse"
@@ -340,7 +446,9 @@ export default function TopicContentScreen() {
               <View key={i} style={styles.listItem}>
                 <View style={styles.listDotContainer}>
                   {ordered ? (
-                    <Text style={styles.listOrderNumber}>{i + 1}.</Text>
+                    <Text style={styles.listOrderNumber}>
+                      {getOrderedMarker(i, payload)}
+                    </Text>
                   ) : (
                     <Ionicons
                       name="ellipse"
@@ -369,7 +477,7 @@ export default function TopicContentScreen() {
                                   <View style={styles.listDotContainer}>
                                     {childOrdered ? (
                                       <Text style={styles.listOrderNumber}>
-                                        {nestedIndex + 1}.
+                                        {getOrderedMarker(nestedIndex, child ?? {})}
                                       </Text>
                                     ) : (
                                       <Ionicons
@@ -416,7 +524,7 @@ export default function TopicContentScreen() {
 
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
-        <Pressable onPress={() => router.back()} style={styles.backButton}>
+        <Pressable onPress={handleBack} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color="#0F172A" />
         </Pressable>
         <Text style={styles.headerTitle} numberOfLines={1}>
@@ -665,7 +773,9 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "700",
     color: COLORS.primary,
-    width: 20,
+    minWidth: 20,
+    flexShrink: 0,
+    textAlign: "right",
   },
   listItemText: {
     flex: 1,

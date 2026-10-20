@@ -162,7 +162,8 @@ export default function TeacherDashboard() {
     isError: isAttendanceError,
     refetch: refetchAttendance,
   } = useQuery({
-    queryKey: ["dashboard-class-attendance", user?.id, assignedClassId, attendanceDate],
+    // Version the key so previously persisted 0/0 summaries are discarded.
+    queryKey: ["dashboard-class-attendance-v2", user?.id, assignedClassId, attendanceDate],
     queryFn: async () => {
       let rosterSize: number;
       if (isAdmin) {
@@ -234,6 +235,8 @@ export default function TeacherDashboard() {
       };
     },
     enabled: !!user && canLoadAttendanceSummary,
+    staleTime: 60_000,
+    refetchOnMount: "always",
     retry: false,
   });
 
